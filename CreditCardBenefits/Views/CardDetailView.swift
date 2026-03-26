@@ -35,7 +35,7 @@ struct CardDetailView: View {
     var body: some View {
         ZStack {
             // Ben cream background
-            Color.benCream.ignoresSafeArea()
+            Ben.Color.cream.ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 0) {
@@ -55,11 +55,11 @@ struct CardDetailView: View {
                             
                             Text(card.name)
                                 .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.benCream)
+                                .foregroundColor(Ben.Color.cream)
                             
                             Text("•••• \(String(card.id.suffix(4)))")
                                 .font(.system(size: 14))
-                                .foregroundColor(.benCream.opacity(0.9))
+                                .foregroundColor(Ben.Color.cream.opacity(0.9))
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(24)
@@ -72,16 +72,16 @@ struct CardDetailView: View {
                     VStack(spacing: 16) {
                         HStack {
                             Text("Annual Fee")
-                                .font(.system(size: 14))
-                                .foregroundColor(.benMute)
+                                .font(Ben.Font.bodySmall)
+                                .foregroundColor(Ben.Color.textMuted)
                             
                             Spacer()
                         }
                         
                         HStack(alignment: .firstTextBaseline) {
                             Text(card.annualFee.asCurrency())
-                                .font(.system(size: 36, weight: .bold))
-                                .foregroundColor(.benDark)
+                                .font(Ben.Font.heroNumber)
+                                .foregroundColor(Ben.Color.textPrimary)
                             
                             Spacer()
                         }
@@ -90,41 +90,39 @@ struct CardDetailView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Text("Benefits Utilized")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.benMute)
+                                    .font(Ben.Font.bodySmall)
+                                    .foregroundColor(Ben.Color.textMuted)
                                 Spacer()
                                 Text(totalUtilized.asCurrency())
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundColor(.benGoodGreen)
+                                    .font(Ben.Font.body)
+                                    .foregroundColor(Ben.Color.mintDark)
                             }
                             
                             HStack {
                                 Text("Total Benefits Available")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.benMute)
+                                    .font(Ben.Font.bodySmall)
+                                    .foregroundColor(Ben.Color.textMuted)
                                 Spacer()
                                 Text(card.totalBenefitsValue.asCurrency())
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundColor(.benBark)
+                                    .font(Ben.Font.body)
+                                    .foregroundColor(Ben.Color.textBody)
                             }
                             
                             Divider()
-                                .background(Color.benMute.opacity(0.3))
+                                .background(Ben.Color.sandBorder)
                                 .padding(.vertical, 8)
                             
                             HStack {
                                 Text("Net Value")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.benMute)
+                                    .font(Ben.Font.body)
+                                    .foregroundColor(Ben.Color.textMuted)
                                 Spacer()
                                 Text((totalUtilized - card.annualFee).asCurrency())
                                     .font(.system(size: 17, weight: .bold))
-                                    .foregroundColor((totalUtilized - card.annualFee) >= 0 ? .benGoodGreen : .red)
+                                    .foregroundColor((totalUtilized - card.annualFee) >= 0 ? Ben.Color.mintDark : Ben.Color.warn)
                             }
                         }
-                        .padding(16)
-                        .background(Color.benSand)
-                        .cornerRadius(12)
+                        .benCard()
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 24)
@@ -134,8 +132,8 @@ struct CardDetailView: View {
                         VStack(spacing: 16) {
                             HStack {
                                 Text("Card Anniversary")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.benMute)
+                                    .font(Ben.Font.bodySmall)
+                                    .foregroundColor(Ben.Color.textMuted)
                                 
                                 Spacer()
                                 
@@ -143,8 +141,8 @@ struct CardDetailView: View {
                                     showingAnniversaryPicker = true
                                 } label: {
                                     Text(cardMatch?.anniversaryDate != nil ? "Edit" : "Set Date")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.blue)
+                                        .font(Ben.Font.body)
+                                        .foregroundColor(Ben.Color.forest)
                                 }
                             }
                             
@@ -152,24 +150,22 @@ struct CardDetailView: View {
                                 if let anniversaryDate = cardMatch?.anniversaryDate {
                                     Text(anniversaryDate.formatted(date: .abbreviated, time: .omitted))
                                         .font(.system(size: 17, weight: .semibold))
-                                        .foregroundColor(.benDark)
+                                        .foregroundColor(Ben.Color.textPrimary)
                                 } else {
                                     Text("Not set")
                                         .font(.system(size: 17, weight: .semibold))
-                                        .foregroundColor(.benWarn)
+                                        .foregroundColor(Ben.Color.warn)
                                 }
                                 
                                 Spacer()
                             }
                             
                             Text("Used to track annual benefits that reset on your account anniversary")
-                                .font(.system(size: 12))
-                                .foregroundColor(.benMute)
+                                .font(Ben.Font.caption)
+                                .foregroundColor(Ben.Color.textMuted)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .padding(16)
-                        .background(Color.benSand)
-                        .cornerRadius(12)
+                        .benCard()
                         .padding(.horizontal, 20)
                         .padding(.bottom, 24)
                     }
@@ -177,8 +173,8 @@ struct CardDetailView: View {
                     // Benefits Breakdown
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Benefits")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.benDark)
+                            .font(Ben.Font.bodyLarge)
+                            .foregroundColor(Ben.Color.textPrimary)
                             .padding(.horizontal, 20)
 
                         ForEach(card.benefits) { benefit in
@@ -194,6 +190,7 @@ struct CardDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(card.name)
         .toolbar {
             if showBackButton {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -211,6 +208,8 @@ struct CardDetailView: View {
                 }
             }
         }
+        .toolbarBackground(Ben.Color.cream, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showingAnniversaryPicker) {
             if let plaidAccount = cardMatch?.plaidAccount {
                 EditAnniversaryDateView(
@@ -279,46 +278,46 @@ struct AmexBenefitRow: View {
                 HStack(spacing: 16) {
                     // Status indicator
                     Circle()
-                        .fill(isUsed ? Color.benGoodGreen : Color.benMute.opacity(0.3))
+                        .fill(isUsed ? Ben.Color.mintDark : Ben.Color.textMuted.opacity(0.3))
                         .frame(width: 12, height: 12)
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text(benefit.name)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.benDark)
+                            .font(Ben.Font.body)
+                            .foregroundColor(Ben.Color.textPrimary)
 
                         if isUsed {
                             if canAutoDetect && amountUsed > 0 {
                                 HStack(spacing: 4) {
                                     Text("Used \(amountUsed.asCurrency()) • \((utilizationPercentage * 100).rounded())% utilized")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.benGoodGreen)
+                                        .font(Ben.Font.bodySmall)
+                                        .foregroundColor(Ben.Color.mintDark)
                                     
                                     if !matchedTransactions.isEmpty {
                                         Text("• \(matchedTransactions.count) transaction\(matchedTransactions.count == 1 ? "" : "s")")
-                                            .font(.system(size: 13))
-                                            .foregroundColor(.blue)
+                                            .font(Ben.Font.bodySmall)
+                                            .foregroundColor(Ben.Color.forest)
                                     }
                                 }
                             } else if isManuallyMarked {
                                 Text("Marked as used • \(benefit.annualAmount.asCurrency()) value")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.benGoodGreen)
+                                    .font(Ben.Font.bodySmall)
+                                    .foregroundColor(Ben.Color.mintDark)
                             } else {
                                 Text("Not used • \(benefit.annualAmount.asCurrency()) available")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.benMute)
+                                    .font(Ben.Font.bodySmall)
+                                    .foregroundColor(Ben.Color.textMuted)
                             }
                         } else {
                             HStack(spacing: 4) {
                                 Text("Not used • \(benefit.annualAmount.asCurrency()) available")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.benMute)
+                                    .font(Ben.Font.bodySmall)
+                                    .foregroundColor(Ben.Color.textMuted)
                                 
                                 if !canAutoDetect {
                                     Text("• Tap to mark")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.blue)
+                                        .font(Ben.Font.bodySmall)
+                                        .foregroundColor(Ben.Color.forest)
                                 }
                             }
                         }
@@ -328,18 +327,16 @@ struct AmexBenefitRow: View {
 
                     HStack(spacing: 8) {
                         Text(benefit.annualAmount.asCurrency())
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.benDark)
+                            .font(Ben.Font.body)
+                            .foregroundColor(Ben.Color.textPrimary)
                         
                         // Always show chevron - all benefits are tappable now
                         Image(systemName: "chevron.right")
                             .font(.system(size: 12))
-                            .foregroundColor(.benMute.opacity(0.5))
+                            .foregroundColor(Ben.Color.textMuted.opacity(0.5))
                     }
                 }
-                .padding(16)
-                .background(Color.benSand)
-                .cornerRadius(12)
+                .benCard()
                 .padding(.horizontal, 20)
             }
             .buttonStyle(PlainButtonStyle())
@@ -401,50 +398,50 @@ struct BenefitTransactionsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.benCream.ignoresSafeArea()
+                Ben.Color.cream.ignoresSafeArea()
                 
                 List {
                     // Summary Section
                     Section {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(benefit.name)
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.benDark)
+                                .font(Ben.Font.bodyLarge)
+                                .foregroundColor(Ben.Color.textPrimary)
                             
                             Text(benefit.description)
-                                .font(.system(size: 14))
-                                .foregroundColor(.benMute)
+                                .font(Ben.Font.bodySmall)
+                                .foregroundColor(Ben.Color.textMuted)
                             
                             if let utilization = utilization {
                                 Divider()
-                                    .background(Color.benMute.opacity(0.3))
+                                    .background(Ben.Color.sandBorder)
                                     .padding(.vertical, 8)
                                 
                                 HStack {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Amount Used")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(.benMute)
+                                            .font(Ben.Font.caption)
+                                            .foregroundColor(Ben.Color.textMuted)
                                         Text(utilization.amountUtilized.asCurrency())
                                             .font(.system(size: 18, weight: .bold))
-                                            .foregroundColor(.benGoodGreen)
+                                            .foregroundColor(Ben.Color.mintDark)
                                     }
                                     
                                     Spacer()
                                     
                                     VStack(alignment: .trailing, spacing: 4) {
                                         Text("Remaining")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(.benMute)
+                                            .font(Ben.Font.caption)
+                                            .foregroundColor(Ben.Color.textMuted)
                                         Text(utilization.amountRemaining.asCurrency())
                                             .font(.system(size: 18, weight: .bold))
-                                            .foregroundColor(.benDark)
+                                            .foregroundColor(Ben.Color.textPrimary)
                                     }
                                 }
                             }
                         }
                         .padding(.vertical, 8)
-                        .listRowBackground(Color.benSand)
+                        .listRowBackground(Ben.Color.sand)
                     }
                     
                     // Matched Transactions Section
@@ -452,7 +449,7 @@ struct BenefitTransactionsView: View {
                         Section(header: Text("Auto-Matched Transactions (\(transactions.count))")) {
                             ForEach(transactions.sorted(by: { $0.date > $1.date })) { transaction in
                                 TransactionRowView(transaction: transaction)
-                                    .listRowBackground(Color.benSand)
+                                    .listRowBackground(Ben.Color.sand)
                             }
                         }
                     }
@@ -463,46 +460,46 @@ struct BenefitTransactionsView: View {
                             TextField("Search merchant or category", text: $searchText)
                                 .textFieldStyle(.plain)
                                 .padding(12)
-                                .background(Color.benMute.opacity(0.2))
+                                .background(Ben.Color.textMuted.opacity(0.2))
                                 .cornerRadius(8)
-                                .foregroundColor(.benDark)
+                                .foregroundColor(Ben.Color.textPrimary)
                             
                             if !searchText.isEmpty {
                                 Text("\(filteredTransactions.count) results")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.benMute)
+                                    .font(Ben.Font.caption)
+                                    .foregroundColor(Ben.Color.textMuted)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.top, 8)
                             }
                         }
-                        .listRowBackground(Color.benSand)
+                        .listRowBackground(Ben.Color.sand)
                     }
                     
                     if !searchText.isEmpty && !filteredTransactions.isEmpty {
                         Section(header: Text("Search Results")) {
                             ForEach(filteredTransactions.prefix(50)) { transaction in
                                 TransactionRowView(transaction: transaction, showType: true)
-                                    .listRowBackground(Color.benSand)
+                                    .listRowBackground(Ben.Color.sand)
                             }
                             
                             if filteredTransactions.count > 50 {
                                 Text("Showing first 50 results")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.benMute)
-                                    .listRowBackground(Color.benSand)
+                                    .font(Ben.Font.caption)
+                                    .foregroundColor(Ben.Color.textMuted)
+                                    .listRowBackground(Ben.Color.sand)
                             }
                         }
                     } else if searchText.isEmpty {
                         Section {
                             HStack {
                                 Image(systemName: "magnifyingglass")
-                                    .foregroundColor(.benMute)
+                                    .foregroundColor(Ben.Color.textMuted)
                                 Text("Search for transactions to debug matching")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.benMute)
+                                    .font(Ben.Font.bodySmall)
+                                    .foregroundColor(Ben.Color.textMuted)
                             }
                             .padding(.vertical, 8)
-                            .listRowBackground(Color.benSand)
+                            .listRowBackground(Ben.Color.sand)
                         }
                     }
                 }
@@ -515,7 +512,7 @@ struct BenefitTransactionsView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Ben.Color.forest)
                 }
             }
             .preferredColorScheme(.light)
@@ -546,70 +543,70 @@ struct ManualBenefitToggleView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.benCream.ignoresSafeArea()
+                Ben.Color.cream.ignoresSafeArea()
                 
                 Form {
                     Section {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(benefit.name)
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.benDark)
+                                .font(Ben.Font.bodyLarge)
+                                .foregroundColor(Ben.Color.textPrimary)
                             
                             Text(benefit.description)
-                                .font(.system(size: 14))
-                                .foregroundColor(.benMute)
+                                .font(Ben.Font.bodySmall)
+                                .foregroundColor(Ben.Color.textMuted)
                             
                             HStack {
                                 Text("Annual Value:")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.benMute)
+                                    .font(Ben.Font.bodySmall)
+                                    .foregroundColor(Ben.Color.textMuted)
                                 Spacer()
                                 Text(benefit.annualAmount.asCurrency())
                                     .font(.system(size: 18, weight: .bold))
-                                    .foregroundColor(.benGoodGreen)
+                                    .foregroundColor(Ben.Color.mintDark)
                             }
                             .padding(.top, 8)
                         }
                         .padding(.vertical, 8)
-                        .listRowBackground(Color.benSand)
+                        .listRowBackground(Ben.Color.sand)
                     }
                     
                     Section(header: Text("Usage Status")) {
                         Toggle(isOn: $isUsing) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("I'm using this benefit")
-                                    .font(.system(size: 15))
-                                    .foregroundColor(.benDark)
+                                    .font(Ben.Font.body)
+                                    .foregroundColor(Ben.Color.textPrimary)
                                 Text("Mark if you're actively using this benefit")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.benMute)
+                                    .font(Ben.Font.caption)
+                                    .foregroundColor(Ben.Color.textMuted)
                             }
                         }
-                        .tint(.benGoodGreen)
-                        .listRowBackground(Color.benSand)
+                        .tint(Ben.Color.mintDark)
+                        .listRowBackground(Ben.Color.sand)
                     }
                     
                     if isUsing {
                         Section(header: Text("Notes (Optional)")) {
                             TextField("Add a note", text: $note, axis: .vertical)
                                 .lineLimit(3...6)
-                                .foregroundColor(.benDark)
-                                .listRowBackground(Color.benSand)
+                                .foregroundColor(Ben.Color.textPrimary)
+                                .listRowBackground(Ben.Color.sand)
                         }
                     }
                     
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
                             Label("Can't auto-detect", systemImage: "info.circle")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.blue)
+                                .font(Ben.Font.bodySmall)
+                                .foregroundColor(Ben.Color.forest)
                             
                             Text("This benefit is delivered outside of credit card transactions (e.g., credits added to partner apps). Use this toggle to manually track if you're using it.")
-                                .font(.system(size: 12))
-                                .foregroundColor(.benMute)
+                                .font(Ben.Font.caption)
+                                .foregroundColor(Ben.Color.textMuted)
                         }
                         .padding(.vertical, 4)
-                        .listRowBackground(Color.benSand)
+                        .listRowBackground(Ben.Color.sand)
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -621,7 +618,7 @@ struct ManualBenefitToggleView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.benForest)
+                    .foregroundColor(Ben.Color.forest)
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
@@ -631,7 +628,7 @@ struct ManualBenefitToggleView: View {
                             dismiss()
                         }
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Ben.Color.forest)
                     .fontWeight(.semibold)
                 }
             }
@@ -672,32 +669,32 @@ struct TransactionRowView: View {
             VStack(spacing: 2) {
                 Text(transaction.date.formatted(.dateTime.month(.abbreviated)))
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.benMute)
+                    .foregroundColor(Ben.Color.textMuted)
                 Text("\(Calendar.current.component(.day, from: transaction.date))")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.benDark)
+                    .foregroundColor(Ben.Color.textPrimary)
             }
             .frame(width: 40)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(transaction.merchant)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.benDark)
+                    .font(Ben.Font.body)
+                    .foregroundColor(Ben.Color.textPrimary)
                     .lineLimit(2)
                 
                 HStack(spacing: 8) {
                     if let category = transaction.category {
                         Text(category)
-                            .font(.system(size: 12))
-                            .foregroundColor(.benMute)
+                            .font(Ben.Font.caption)
+                            .foregroundColor(Ben.Color.textMuted)
                     }
                     
                     if showType {
                         Text("•")
-                            .foregroundColor(.benMute.opacity(0.5))
+                            .foregroundColor(Ben.Color.textMuted.opacity(0.5))
                         Text(transaction.isCredit ? "Credit" : "Purchase")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(transaction.isCredit ? .benGoodGreen : .blue)
+                            .font(Ben.Font.caption)
+                            .foregroundColor(transaction.isCredit ? Ben.Color.mintDark : Ben.Color.forest)
                     }
                 }
             }
@@ -705,8 +702,8 @@ struct TransactionRowView: View {
             Spacer()
             
             Text((transaction.isCredit ? "-" : "") + transaction.amount.asCurrency())
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(transaction.isCredit ? .benGoodGreen : .benDark)
+                .font(Ben.Font.body)
+                .foregroundColor(transaction.isCredit ? Ben.Color.mintDark : Ben.Color.textPrimary)
         }
         .padding(.vertical, 4)
     }

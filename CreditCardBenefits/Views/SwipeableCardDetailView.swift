@@ -14,7 +14,6 @@ struct SwipeableCardDetailView: View {
     let allCards: [CreditCard]
     
     @State private var selectedCardIndex: Int = 0
-    @State private var showingCompactList = false
     @GestureState private var dragOffset: CGFloat = 0
     
     init(initialCard: CreditCard, allCards: [CreditCard]) {
@@ -40,28 +39,6 @@ struct SwipeableCardDetailView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .ignoresSafeArea()
-                
-                // Compact list button (top left, tucked in corner)
-                VStack {
-                    HStack {
-                        Button(action: {
-                            showingCompactList = true
-                        }) {
-                            Image(systemName: "square.grid.2x2")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.white)
-                                .frame(width: 32, height: 32)
-                                .background(Color.black.opacity(0.3))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .padding(.leading, 16)
-                        .padding(.top, 54) // Just below status bar
-                        
-                        Spacer()
-                    }
-                    
-                    Spacer()
-                }
             }
         }
         .navigationBarHidden(true)
@@ -80,13 +57,6 @@ struct SwipeableCardDetailView: View {
                     }
                 }
         )
-        .sheet(isPresented: $showingCompactList) {
-            CompactCardListView(
-                allCards: allCards,
-                selectedCardIndex: $selectedCardIndex,
-                isPresented: $showingCompactList
-            )
-        }
     }
 }
 
@@ -101,28 +71,28 @@ struct CompactCardListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea()
+                Ben.Color.forest.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Wednesday, March 18")
-                            .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.6))
+                            .font(Ben.Font.caption)
+                            .foregroundColor(Ben.Color.cream.opacity(0.6))
                             .padding(.horizontal, 20)
                             .padding(.top, 20)
                         
                         Text("Overview")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(.white)
+                            .font(Ben.Font.screenTitle)
+                            .foregroundColor(Ben.Color.cream)
                             .padding(.horizontal, 20)
                         
                         Divider()
-                            .background(Color.white.opacity(0.2))
+                            .background(Ben.Color.cream.opacity(0.2))
                             .padding(.vertical, 16)
                         
                         Text("Cards")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
+                            .font(Ben.Font.bodyLarge)
+                            .foregroundColor(Ben.Color.cream)
                             .padding(.horizontal, 20)
                         
                         // Card list
@@ -146,7 +116,7 @@ struct CompactCardListView: View {
                     Button("Log out") {
                         // Handle logout
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Ben.Color.mint)
                 }
             }
             .preferredColorScheme(.dark)
@@ -173,11 +143,11 @@ struct CompactCardRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(totalUtilized.asCurrency())
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Ben.Color.cream)
                 
                 Text(card.name)
-                    .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.6))
+                    .font(Ben.Font.bodySmall)
+                    .foregroundColor(Ben.Color.cream.opacity(0.6))
                     .lineLimit(1)
             }
             
@@ -185,10 +155,10 @@ struct CompactCardRow: View {
             
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundColor(Ben.Color.cream.opacity(0.3))
         }
         .padding(16)
-        .background(Color.white.opacity(0.08))
+        .background(Ben.Color.cream.opacity(0.08))
         .cornerRadius(12)
         .padding(.horizontal, 20)
     }
@@ -204,7 +174,7 @@ struct CompactCardRow: View {
             
             Text(card.issuer.rawValue.uppercased())
                 .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(Ben.Color.cream.opacity(0.8))
         }
         .frame(width: 80, height: 50)
     }

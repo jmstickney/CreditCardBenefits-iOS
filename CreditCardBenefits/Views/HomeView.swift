@@ -12,44 +12,39 @@ struct HomeView: View {
     @EnvironmentObject var dataManager: AppDataManager
     @State private var showingAddCard = false
     @State private var linkToken: String?
+    
+    // Computed properties for HomeHeaderView
+    private var totalUsedValue: Double {
+        dataManager.utilizationService.utilizations.reduce(0) { $0 + $1.amountUtilized }
+    }
+    
+    private var totalAnnualFees: Double {
+        dataManager.userCards.reduce(0) { $0 + $1.annualFee }
+    }
+    
+    private var unusedBenefitCount: Int {
+        let usedBenefitIds = Set(dataManager.utilizationService.utilizations.filter { $0.amountUtilized > 0 }.map { $0.benefitId })
+        let allBenefitIds = Set(dataManager.userCards.flatMap { $0.benefits.map { $0.id } })
+        return allBenefitIds.count - usedBenefitIds.count
+    }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Ben cream background
-                Color.benCream.ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Header with date and welcome
-                        VStack(alignment: .leading, spacing: 20) {
-                            Text(Date().asDateString)
-                                .font(.system(size: 13))
-                                .foregroundColor(.benMute)
-
-                            Text("Welcome")
-                                .font(.system(size: 32, weight: .bold))
-                                .foregroundColor(.benDark)
-                            
-                            // Horizontal utilization bar
-                            if dataManager.userCards.count > 0 {
-                                CompactBenefitUtilizationBar(
-                                    userCards: dataManager.userCards,
-                                    utilizations: dataManager.utilizationService.utilizations
-                                )
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 60)
-                        .padding(.bottom, 32)
-
-                        // Accounts section
-                        VStack(alignment: .leading, spacing: 16) {
+        ScrollView {
+                VStack(spacing: 0) {
+                    // New HomeHeaderView component
+                    HomeHeaderView(
+                        usedValue: totalUsedValue,
+                        totalFees: totalAnnualFees,
+                        cardCount: dataManager.userCards.count,
+                        unusedBenefitCount: unusedBenefitCount
+                    )
+                    
+                    // Accounts section
+                    VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("Accounts")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.benDark)
+                                    .font(Ben.Font.bodyLarge)
+                                    .foregroundColor(Ben.Color.textPrimary)
                                 
                                 Spacer()
                                 
@@ -60,7 +55,7 @@ struct HomeView: View {
                                 }) {
                                     Image(systemName: "plus")
                                         .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.benForest)
+                                        .foregroundColor(Ben.Color.forest)
                                 }
                             }
                             .padding(.horizontal, 20)
@@ -82,31 +77,31 @@ struct HomeView: View {
                                     .buttonStyle(PlainButtonStyle())
                                 }
                             }
-                        }
+                    }
 
-                        // Recommendations section (if any)
-                        if !dataManager.recommendations.isEmpty {
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("Don't Miss Out")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.benDark)
-                                    .padding(.horizontal, 20)
-                                    .padding(.top, 32)
+                    // Recommendations section (if any)
+                    if !dataManager.recommendations.isEmpty {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Don't Miss Out")
+                                .font(Ben.Font.bodyLarge)
+                                .foregroundColor(Ben.Color.textPrimary)
+                                .padding(.horizontal, 20)
+                                .padding(.top, 32)
 
-                                ForEach(dataManager.recommendations.prefix(2)) { recommendation in
-                                    AmexStyleRecommendationCard(recommendation: recommendation) {
-                                        handleRecommendationTap(recommendation)
-                                    }
+                            ForEach(dataManager.recommendations.prefix(2)) { recommendation in
+                                AmexStyleRecommendationCard(recommendation: recommendation) {
+                                    handleRecommendationTap(recommendation)
                                 }
                             }
                         }
-
-                        Spacer(minLength: 100)
                     }
+
+                    Spacer(minLength: 100)
                 }
             }
-            .navigationBarHidden(true)
-            .preferredColorScheme(.dark)
+            .benBackground()
+            .navigationBarTitleDisplayMode(.inline)
+            .preferredColorScheme(.light)
             .onAppear {
                 if !dataManager.plaidService.transactions.isEmpty {
                     dataManager.loadData(from: dataManager.plaidService.transactions)
@@ -147,7 +142,6 @@ struct HomeView: View {
                 if !newAccounts.isEmpty {
                     Task {
                         await dataManager.processPlaidAccounts()
-                    }
                 }
             }
         }
@@ -226,28 +220,25 @@ struct AmexStyleCardRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 // Card name (like "Platinum Card® (•••81009)")
                 Text(card.name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.benDark)
+                    .font(Ben.Font.body)
+                    .foregroundColor(Ben.Color.textPrimary)
                     .lineLimit(1)
                 
                 // Benefits summary (like "Payment due in 3 days")
                 if unusedBenefits > 0 {
                     Text("\(unusedBenefits) of \(totalBenefits) benefits unused")
-                        .font(.system(size: 13))
-                        .foregroundColor(.benWarn)
+                        .font(Ben.Font.bodySmall)
+                        .foregroundColor(Ben.Color.warn)
                 } else {
                     Text("All \(totalBenefits) benefits active")
-                        .font(.system(size: 13))
-                        .foregroundColor(.benGoodGreen)
+                        .font(Ben.Font.bodySmall)
+                        .foregroundColor(Ben.Color.mintDark)
                 }
             }
             
             Spacer()
         }
-        .padding(16)
-        .background(Color.benSand)
-        .cornerRadius(12)
-        .padding(.horizontal, 20)
+        .benCard()
     }
 }
 
@@ -262,24 +253,24 @@ struct AmexStyleRecommendationCard: View {
             HStack(spacing: 16) {
                 // Icon matching Ben theme
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.benForest.opacity(0.2))
+                    .fill(Ben.Color.forest.opacity(0.2))
                     .frame(width: 56, height: 36)
                     .overlay(
                         Image(systemName: recommendation.type.icon)
                             .font(.system(size: 16))
-                            .foregroundColor(.benForest)
+                            .foregroundColor(Ben.Color.forest)
                     )
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(recommendation.title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.benDark)
+                        .font(Ben.Font.body)
+                        .foregroundColor(Ben.Color.textPrimary)
                         .lineLimit(2)
                     
                     if recommendation.potentialSavings > 0 {
                         Text("Save \(recommendation.potentialSavings.asCurrency())/year")
-                            .font(.system(size: 13))
-                            .foregroundColor(.benGoodGreen)
+                            .font(Ben.Font.bodySmall)
+                            .foregroundColor(Ben.Color.mintDark)
                     }
                 }
                 
@@ -287,12 +278,9 @@ struct AmexStyleRecommendationCard: View {
                 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.benMute.opacity(0.5))
+                    .foregroundColor(Ben.Color.textMuted.opacity(0.5))
             }
-            .padding(16)
-            .background(Color.benSand)
-            .cornerRadius(12)
-            .padding(.horizontal, 20)
+            .benCard()
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -305,22 +293,19 @@ struct EmptyAccountsView: View {
         VStack(spacing: 16) {
             Image(systemName: "creditcard")
                 .font(.system(size: 48))
-                .foregroundColor(.benMute.opacity(0.3))
+                .foregroundColor(Ben.Color.textMuted.opacity(0.3))
             
             Text("No cards connected")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.benBark)
+                .font(Ben.Font.body)
+                .foregroundColor(Ben.Color.textBody)
             
             Text("Connect your bank account to get started")
-                .font(.system(size: 13))
-                .foregroundColor(.benMute)
+                .font(Ben.Font.bodySmall)
+                .foregroundColor(Ben.Color.textMuted)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(40)
-        .background(Color.benSand)
-        .cornerRadius(12)
-        .padding(.horizontal, 20)
+        .benCard(padding: 40)
     }
 }
 

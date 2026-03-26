@@ -33,17 +33,7 @@ struct CreditCardBenefitsApp: App {
                 if !dataManager.hasCompletedOnboarding {
                     BenOnboardingView()
                 } else {
-                    TabView {
-                        HomeView()
-                            .tabItem {
-                                Label("Home", systemImage: "house.fill")
-                            }
-
-                        SettingsView()
-                            .tabItem {
-                                Label("Settings", systemImage: "gear")
-                            }
-                    }
+                    BenTabView()
                 }
             }
             .environmentObject(dataManager)

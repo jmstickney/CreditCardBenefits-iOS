@@ -7,7 +7,7 @@ struct BenOnboardingView: View {
 
     var body: some View {
         ZStack {
-            Color.benCream.ignoresSafeArea()
+            Ben.Color.cream.ignoresSafeArea()
 
             TabView(selection: $currentPage) {
                 WelcomeScreen(onNext: { advance() })
@@ -46,7 +46,7 @@ struct PageDotsView: View {
         HStack(spacing: 6) {
             ForEach(0..<total, id: \.self) { i in
                 Capsule()
-                    .fill(i == current ? Color.benForest : Color.benMute.opacity(0.3))
+                    .fill(i == current ? Ben.Color.forest : Ben.Color.textMuted.opacity(0.3))
                     .frame(width: i == current ? 18 : 6, height: 6)
                     .animation(.spring(response: 0.3), value: current)
             }
@@ -65,11 +65,11 @@ struct WelcomeScreen: View {
 
             VStack(spacing: 6) {
                 Text("ben.")
-                    .font(.custom("Georgia", size: 42).bold())
-                    .foregroundColor(.benForest)
+                    .font(Ben.Font.logo)
+                    .foregroundColor(Ben.Color.forest)
                 Text("Your credit cards have a secret.")
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundColor(.benMute)
+                    .font(Ben.Font.bodySmall)
+                    .foregroundColor(Ben.Color.textMuted)
             }
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 16)
@@ -91,8 +91,8 @@ struct WelcomeScreen: View {
             Spacer().frame(height: 20)
 
             Text("Your cards are packed with credits and perks.\nBen makes sure you actually use them.")
-                .font(.system(size: 14, weight: .regular))
-                .foregroundColor(.benBark)
+                .font(Ben.Font.bodySmall)
+                .foregroundColor(Ben.Color.textBody)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
                 .padding(.horizontal, 36)
@@ -136,21 +136,21 @@ struct ProblemScreen: View {
                         .padding(.top, 24)
 
                     Text("High fees.\nHidden benefits.\nEasy to lose.")
-                        .font(.custom("Georgia", size: 26).weight(.semibold))
-                        .foregroundColor(.benDark)
+                        .font(Ben.Font.serif(26, weight: .semibold))
+                        .foregroundColor(Ben.Color.textPrimary)
                         .lineSpacing(2)
                         .padding(.top, 10)
 
                     Text("Premium cards offset their fees with credits — but most require enrollment, reset monthly, and are buried in apps nobody opens.")
-                        .font(.system(size: 14))
-                        .foregroundColor(.benBark)
+                        .font(Ben.Font.bodySmall)
+                        .foregroundColor(Ben.Color.textBody)
                         .lineSpacing(4)
                         .padding(.top, 12)
                         .padding(.bottom, 20)
 
                     HStack(spacing: 10) {
-                        MiniStatCard(label: "Annual fee", value: "$895", subtitle: "Amex Platinum", valueColor: .benWarn)
-                        MiniStatCard(label: "Avg. used", value: "$483", subtitle: "Typical cardholder", valueColor: .benWarn)
+                        MiniStatCard(label: "Annual fee", value: "$895", subtitle: "Amex Platinum", valueColor: Ben.Color.warn)
+                        MiniStatCard(label: "Avg. used", value: "$483", subtitle: "Typical cardholder", valueColor: Ben.Color.warn)
                     }
                     .padding(.bottom, 16)
 
@@ -158,8 +158,8 @@ struct ProblemScreen: View {
                         .padding(.bottom, 10)
 
                     Text("Green = benefits most people forget. Ben tracks them all.")
-                        .font(.system(size: 12))
-                        .foregroundColor(.benMute)
+                        .font(Ben.Font.caption)
+                        .foregroundColor(Ben.Color.textMuted)
                         .padding(.bottom, 20)
                 }
                 .padding(.horizontal, 28)
@@ -193,14 +193,14 @@ struct HowItWorksScreen: View {
                     .padding(.top, 24)
 
                 Text("Connect once.\nBen handles the rest.")
-                    .font(.custom("Georgia", size: 26).weight(.semibold))
-                    .foregroundColor(.benDark)
+                    .font(Ben.Font.serif(26, weight: .semibold))
+                    .foregroundColor(Ben.Color.textPrimary)
                     .lineSpacing(2)
                     .padding(.top, 10)
 
                 Text("No manual tracking. No spreadsheets. No forgetting to enroll.")
-                    .font(.system(size: 14))
-                    .foregroundColor(.benBark)
+                    .font(Ben.Font.bodySmall)
+                    .foregroundColor(Ben.Color.textBody)
                     .lineSpacing(4)
                     .padding(.top, 12)
                     .padding(.bottom, 28)
@@ -244,21 +244,21 @@ struct DashboardPreviewScreen: View {
                     .padding(.top, 24)
 
                 Text("Know exactly\nwhere you stand.")
-                    .font(.custom("Georgia", size: 26).weight(.semibold))
-                    .foregroundColor(.benDark)
+                    .font(Ben.Font.serif(26, weight: .semibold))
+                    .foregroundColor(Ben.Color.textPrimary)
                     .lineSpacing(2)
                     .padding(.top, 10)
 
                 Text("Ben's ROI meter shows what you've captured vs. what's still on the table — updated after every transaction.")
-                    .font(.system(size: 14))
-                    .foregroundColor(.benBark)
+                    .font(Ben.Font.bodySmall)
+                    .foregroundColor(Ben.Color.textBody)
                     .lineSpacing(4)
                     .padding(.top, 12)
                     .padding(.bottom, 20)
 
                 HStack(spacing: 10) {
-                    MiniStatCard(label: "Fee paid", value: "$895", subtitle: "Amex Platinum", valueColor: .benDark)
-                    MiniStatCard(label: "Value used", value: "$643", subtitle: "so far this year", valueColor: .benGoodGreen)
+                    MiniStatCard(label: "Fee paid", value: "$895", subtitle: "Amex Platinum", valueColor: Ben.Color.textPrimary)
+                    MiniStatCard(label: "Value used", value: "$643", subtitle: "so far this year", valueColor: Ben.Color.mintDark)
                 }
                 .padding(.bottom, 16)
 
@@ -267,19 +267,19 @@ struct DashboardPreviewScreen: View {
                     HStack {
                         Text("Benefits used")
                             .font(.system(size: 11))
-                            .foregroundColor(.benMute)
+                            .foregroundColor(Ben.Color.textMuted)
                         Spacer()
                         Text("72%")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.benDark)
+                            .foregroundColor(Ben.Color.textPrimary)
                     }
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(Color.benMute.opacity(0.2))
+                                .fill(Ben.Color.textMuted.opacity(0.2))
                                 .frame(height: 10)
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(Color.benForest)
+                                .fill(Ben.Color.forest)
                                 .frame(width: geo.size.width * barProgress, height: 10)
                                 .animation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.3), value: barProgress)
                         }
@@ -287,12 +287,12 @@ struct DashboardPreviewScreen: View {
                     .frame(height: 10)
 
                     Text("$252 still available this year")
-                        .font(.system(size: 11))
-                        .foregroundColor(.benWarn)
+                        .font(Ben.Font.micro)
+                        .foregroundColor(Ben.Color.warn)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
                 .padding(18)
-                .background(Color.benSand)
+                .background(Ben.Color.sand)
                 .cornerRadius(16)
                 .padding(.bottom, 16)
 
@@ -332,11 +332,11 @@ struct PaywallScreen: View {
 
             VStack(spacing: 6) {
                 Text("ben.")
-                    .font(.custom("Georgia", size: 38).bold())
-                    .foregroundColor(.benForest)
+                    .font(Ben.Font.logo)
+                    .foregroundColor(Ben.Color.forest)
                 Text("Start for free. Pay only if you love it.")
-                    .font(.system(size: 13))
-                    .foregroundColor(.benMute)
+                    .font(Ben.Font.bodySmall)
+                    .foregroundColor(Ben.Color.textMuted)
             }
             .opacity(appeared ? 1 : 0)
             .animation(.easeOut(duration: 0.4).delay(0.1), value: appeared)
@@ -345,11 +345,11 @@ struct PaywallScreen: View {
 
             // Price pill
             Text("7 days free  ·  then $4.99 / month")
-                .font(.system(size: 12))
-                .foregroundColor(.benBark)
+                .font(Ben.Font.caption)
+                .foregroundColor(Ben.Color.textBody)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 7)
-                .background(Color.benSand)
+                .background(Ben.Color.sand)
                 .clipShape(Capsule())
                 .opacity(appeared ? 1 : 0)
                 .animation(.easeOut(duration: 0.4).delay(0.2), value: appeared)
@@ -360,17 +360,17 @@ struct PaywallScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Everything in Ben:")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.benDark)
+                    .foregroundColor(Ben.Color.textPrimary)
                     .padding(.bottom, 14)
 
                 ForEach(Array(features.enumerated()), id: \.offset) { index, feature in
                     HStack(alignment: .top, spacing: 10) {
                         Text("✓")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.benGoodGreen)
+                            .foregroundColor(Ben.Color.mintDark)
                         Text(feature)
                             .font(.system(size: 13))
-                            .foregroundColor(.benBark)
+                            .foregroundColor(Ben.Color.textBody)
                             .lineSpacing(3)
                     }
                     .padding(.bottom, index < features.count - 1 ? 10 : 0)
@@ -379,7 +379,7 @@ struct PaywallScreen: View {
                 }
             }
             .padding(20)
-            .background(Color.benSand)
+            .background(Ben.Color.sand)
             .cornerRadius(18)
             .padding(.horizontal, 28)
 
@@ -387,7 +387,7 @@ struct PaywallScreen: View {
 
             Text("If Ben doesn't find you at least $10/month in missed value, cancel anytime — no questions asked.")
                 .font(.system(size: 11))
-                .foregroundColor(.benMute)
+                .foregroundColor(Ben.Color.textMuted)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .padding(.horizontal, 40)
@@ -421,19 +421,19 @@ struct HeroStatCard: View {
             Text(label.uppercased())
                 .font(.system(size: 10, weight: .medium))
                 .tracking(1.0)
-                .foregroundColor(.benMint)
+                .foregroundColor(Ben.Color.mint)
             Text(number)
                 .font(.custom("Georgia", size: 48).bold())
-                .foregroundColor(.benLightMint)
+                .foregroundColor(Ben.Color.mintLight)
                 .lineLimit(1)
             Text(description)
                 .font(.system(size: 12))
-                .foregroundColor(.benMint)
+                .foregroundColor(Ben.Color.mint)
                 .lineSpacing(3)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.benForest)
+        .background(Ben.Color.forest)
         .cornerRadius(20)
     }
 }
@@ -449,17 +449,17 @@ struct MiniStatCard: View {
             Text(label.uppercased())
                 .font(.system(size: 10, weight: .medium))
                 .tracking(0.8)
-                .foregroundColor(.benMute)
+                .foregroundColor(Ben.Color.textMuted)
             Text(value)
                 .font(.custom("Georgia", size: 22).weight(.semibold))
                 .foregroundColor(valueColor)
             Text(subtitle)
                 .font(.system(size: 11))
-                .foregroundColor(.benMute)
+                .foregroundColor(Ben.Color.textMuted)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.benSand)
+        .background(Ben.Color.sand)
         .cornerRadius(14)
     }
 }
@@ -470,7 +470,7 @@ struct TagLabel: View {
         Text(text.uppercased())
             .font(.system(size: 10, weight: .medium))
             .tracking(1.2)
-            .foregroundColor(.benMute)
+            .foregroundColor(Ben.Color.textMuted)
     }
 }
 
@@ -483,21 +483,21 @@ struct StepRow: View {
         HStack(alignment: .top, spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(Color.benForest)
+                    .fill(Ben.Color.forest)
                     .frame(width: 30, height: 30)
                 Text("\(number)")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.benLightMint)
+                    .foregroundColor(Ben.Color.mintLight)
             }
             .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.benDark)
+                    .foregroundColor(Ben.Color.textPrimary)
                 Text(subtitle)
                     .font(.system(size: 12))
-                    .foregroundColor(.benMute)
+                    .foregroundColor(Ben.Color.textMuted)
                     .lineSpacing(3)
             }
         }
@@ -516,13 +516,13 @@ struct BenefitChipsView: View {
             ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
                 Text(chip.0)
                     .font(.system(size: 11))
-                    .foregroundColor(chip.1 ? .benGoodGreen : Color(red: 0.42, green: 0.39, blue: 0.34))
+                    .foregroundColor(chip.1 ? Ben.Color.mintDark : Ben.Color.textBody)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(chip.1 ? Color.benLightMint : Color.benCream)
+                    .background(chip.1 ? Ben.Color.mintLight : Ben.Color.cream)
                     .overlay(
                         Capsule()
-                            .stroke(chip.1 ? Color.benMint : Color.benMute.opacity(0.3), lineWidth: 1)
+                            .stroke(chip.1 ? Ben.Color.mint : Ben.Color.textMuted.opacity(0.3), lineWidth: 1)
                     )
                     .clipShape(Capsule())
                     .strikethrough(!chip.1 && chip.0.contains("✓"))
@@ -531,37 +531,11 @@ struct BenefitChipsView: View {
     }
 }
 
-struct BenButton: View {
-    let title: String
-    let action: () -> Void
 
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.benLightMint)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Color.benForest)
-                .cornerRadius(16)
-        }
-    }
-}
 
-struct BenGhostButton: View {
-    let title: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 13))
-                .foregroundColor(.benMute)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-        }
-    }
-}
+// Use BenPrimaryButton and BenGhostButton from BenTheme.swift
+// Aliased here for convenience in onboarding screens
+typealias BenButton = BenPrimaryButton
 
 // MARK: - Preview
 #Preview {

@@ -44,12 +44,12 @@ struct BenefitUtilizationBar: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Benefit Utilization")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.benDark)
+                        .font(Ben.Font.bodyLarge)
+                        .foregroundColor(Ben.Color.textPrimary)
                     
                     Text("vs. Annual Fees")
-                        .font(.system(size: 13))
-                        .foregroundColor(.benMute)
+                        .font(Ben.Font.bodySmall)
+                        .foregroundColor(Ben.Color.textMuted)
                 }
                 
                 Spacer()
@@ -61,10 +61,10 @@ struct BenefitUtilizationBar: View {
                     Text(isBreakingEven ? "Breaking Even" : "Below Fees")
                         .font(.system(size: 13, weight: .medium))
                 }
-                .foregroundColor(isBreakingEven ? .green : .orange)
+                .foregroundColor(isBreakingEven ? Ben.Color.mintDark : Ben.Color.warn)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(isBreakingEven ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+                .background(isBreakingEven ? Ben.Color.mintLight : Ben.Color.warnLight)
                 .cornerRadius(12)
             }
             
@@ -74,7 +74,7 @@ struct BenefitUtilizationBar: View {
                     ZStack(alignment: .leading) {
                         // Background (total fees)
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.benMute.opacity(0.2))
+                            .fill(Ben.Color.textMuted.opacity(0.2))
                             .frame(width: geometry.size.width, height: 40)
                         
                         // Stacked utilization bars (one per card)
@@ -97,7 +97,7 @@ struct BenefitUtilizationBar: View {
                             Spacer()
                             Text("\(Int(utilizationPercentage))%")
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.benCream)
+                                .foregroundColor(Ben.Color.cream)
                             Spacer()
                         }
                     }
@@ -108,26 +108,26 @@ struct BenefitUtilizationBar: View {
                 HStack(spacing: 4) {
                     Text(totalUtilized.asCurrency())
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(isBreakingEven ? .benGoodGreen : .benWarn)
+                        .foregroundColor(isBreakingEven ? Ben.Color.mintDark : Ben.Color.warn)
                     
                     Text("of")
-                        .font(.system(size: 13))
-                        .foregroundColor(.benMute)
+                        .font(Ben.Font.bodySmall)
+                        .foregroundColor(Ben.Color.textMuted)
                     
                     Text(totalAnnualFees.asCurrency())
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.benBark)
+                        .foregroundColor(Ben.Color.textBody)
                     
                     Spacer()
                     
                     if !isBreakingEven {
                         Text("\(abs(totalAnnualFees - totalUtilized).asCurrency()) to go")
-                            .font(.system(size: 13))
-                            .foregroundColor(.benMute)
+                            .font(Ben.Font.bodySmall)
+                            .foregroundColor(Ben.Color.textMuted)
                     } else {
                         Text("+\((totalUtilized - totalAnnualFees).asCurrency()) ahead")
-                            .font(.system(size: 13))
-                            .foregroundColor(.benGoodGreen)
+                            .font(Ben.Font.bodySmall)
+                            .foregroundColor(Ben.Color.mintDark)
                     }
                 }
             }
@@ -144,14 +144,14 @@ struct BenefitUtilizationBar: View {
                                     .frame(width: 8, height: 8)
                                 
                                 Text(item.card.name)
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.benBark)
+                                    .font(Ben.Font.bodySmall)
+                                    .foregroundColor(Ben.Color.textBody)
                                 
                                 Spacer()
                                 
                                 Text(item.utilized.asCurrency())
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.benDark)
+                                    .font(Ben.Font.bodySmall)
+                                    .foregroundColor(Ben.Color.textPrimary)
                             }
                         }
                     }
@@ -159,15 +159,7 @@ struct BenefitUtilizationBar: View {
                 .padding(.top, 4)
             }
         }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.benSand)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.benMute.opacity(0.2), lineWidth: 1)
-        )
+        .benCard()
     }
     
     // Generate color for each card
@@ -215,23 +207,23 @@ struct CompactBenefitUtilizationBar: View {
             // Header with amounts
             HStack {
                 Text("Benefits Used")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.benBark)
+                    .font(Ben.Font.body)
+                    .foregroundColor(Ben.Color.textBody)
                 
                 Spacer()
                 
                 HStack(spacing: 4) {
                     Text(totalUtilized.asCurrency())
                         .font(.system(size: 17, weight: .bold))
-                        .foregroundColor(isBreakingEven ? .benGoodGreen : .benWarn)
+                        .foregroundColor(isBreakingEven ? Ben.Color.mintDark : Ben.Color.warn)
                     
                     Text("/")
-                        .font(.system(size: 13))
-                        .foregroundColor(.benMute)
+                        .font(Ben.Font.bodySmall)
+                        .foregroundColor(Ben.Color.textMuted)
                     
                     Text(totalAnnualFees.asCurrency())
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.benBark)
+                        .font(Ben.Font.body)
+                        .foregroundColor(Ben.Color.textBody)
                 }
             }
             
@@ -240,7 +232,7 @@ struct CompactBenefitUtilizationBar: View {
                 ZStack(alignment: .leading) {
                     // Background
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.benMute.opacity(0.2))
+                        .fill(Ben.Color.textMuted.opacity(0.2))
                         .frame(width: geometry.size.width, height: 12)
                     
                     // Stacked utilization
@@ -264,23 +256,23 @@ struct CompactBenefitUtilizationBar: View {
             // Status text
             HStack {
                 Text("\(Int(utilizationPercentage))% of annual fees")
-                    .font(.system(size: 13))
-                    .foregroundColor(.benMute)
+                    .font(Ben.Font.bodySmall)
+                    .foregroundColor(Ben.Color.textMuted)
                 
                 Spacer()
                 
                 if !isBreakingEven {
                     Text("\((totalAnnualFees - totalUtilized).asCurrency()) to break even")
-                        .font(.system(size: 13))
-                        .foregroundColor(.benWarn)
+                        .font(Ben.Font.bodySmall)
+                        .foregroundColor(Ben.Color.warn)
                 } else {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 12))
                         Text("Breaking even")
                     }
-                    .font(.system(size: 13))
-                    .foregroundColor(.benGoodGreen)
+                    .font(Ben.Font.bodySmall)
+                    .foregroundColor(Ben.Color.mintDark)
                 }
             }
         }

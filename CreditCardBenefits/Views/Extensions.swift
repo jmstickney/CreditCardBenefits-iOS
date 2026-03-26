@@ -51,29 +51,17 @@ extension Date {
 // MARK: - Color Extensions
 
 extension Color {
-    // MARK: - Ben Color Theme
-    static let benForest     = Color(red: 0.102, green: 0.239, blue: 0.169) // #1A3D2B
-    static let benMint       = Color(red: 0.490, green: 0.749, blue: 0.604) // #7DBF9A
-    static let benCream      = Color(red: 0.996, green: 0.988, blue: 0.969) // #FEFCF7
-    static let benSand       = Color(red: 0.933, green: 0.914, blue: 0.875) // #EEE9DF
-    static let benBark       = Color(red: 0.420, green: 0.388, blue: 0.337) // #6B6356
-    static let benMute       = Color(red: 0.541, green: 0.498, blue: 0.431) // #8A7F6E
-    static let benDark       = Color(red: 0.110, green: 0.102, blue: 0.082) // #1C1A15
-    static let benWarn       = Color(red: 0.722, green: 0.361, blue: 0.039) // #B85C0A
-    static let benGoodGreen  = Color(red: 0.102, green: 0.420, blue: 0.251) // #1A6B40
-    static let benLightMint  = Color(red: 0.910, green: 0.961, blue: 0.933) // #E8F5EE
-    
     /// Returns color for data source badge
     static func forDataSource(_ dataSource: DataSource) -> Color {
         switch dataSource.badgeColor {
         case "green":
-            return .benGoodGreen
+            return Ben.Color.mintDark
         case "orange":
-            return .benWarn
+            return Ben.Color.warn
         case "gray":
-            return .benMute
+            return Ben.Color.textMuted
         default:
-            return .benMute
+            return Ben.Color.textMuted
         }
     }
     
