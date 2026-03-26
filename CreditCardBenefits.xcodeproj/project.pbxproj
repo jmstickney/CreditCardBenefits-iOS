@@ -11,6 +11,7 @@
 		812C5DC42EF4AA6200E270B1 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 812C5DC32EF4AA6200E270B1 /* FirebaseCore */; };
 		812C5DC62EF4AA6C00E270B1 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 812C5DC52EF4AA6C00E270B1 /* FirebaseAuth */; };
 		812C5DC82EF4AA8700E270B1 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 812C5DC72EF4AA8700E270B1 /* FirebaseFunctions */; };
+		81EAD0C02F368F3C002CD994 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 81EAD0BF2F368F3C002CD994 /* FirebaseFirestore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -20,9 +21,22 @@
 		8153EC372EE361890001B9A5 /* CreditCardBenefits.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = CreditCardBenefits.xcodeproj; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		817F166D2F3ECD4A00E521CF /* Exceptions for "CreditCardBenefits" folder in "CreditCardBenefits" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8153EBB32EE28D930001B9A5 /* CreditCardBenefits */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8153EBB62EE28D930001B9A5 /* CreditCardBenefits */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				817F166D2F3ECD4A00E521CF /* Exceptions for "CreditCardBenefits" folder in "CreditCardBenefits" target */,
+			);
 			path = CreditCardBenefits;
 			sourceTree = "<group>";
 		};
@@ -36,6 +50,7 @@
 				812C5DC42EF4AA6200E270B1 /* FirebaseCore in Frameworks */,
 				812C5DC62EF4AA6C00E270B1 /* FirebaseAuth in Frameworks */,
 				812C5DB82EF2485F00E270B1 /* LinkKit in Frameworks */,
+				81EAD0C02F368F3C002CD994 /* FirebaseFirestore in Frameworks */,
 				812C5DC82EF4AA8700E270B1 /* FirebaseFunctions in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -110,6 +125,7 @@
 				812C5DC32EF4AA6200E270B1 /* FirebaseCore */,
 				812C5DC52EF4AA6C00E270B1 /* FirebaseAuth */,
 				812C5DC72EF4AA8700E270B1 /* FirebaseFunctions */,
+				81EAD0BF2F368F3C002CD994 /* FirebaseFirestore */,
 			);
 			productName = CreditCardBenefits;
 			productReference = 8153EBB42EE28D930001B9A5 /* CreditCardBenefits.app */;
@@ -319,6 +335,8 @@
 				DEVELOPMENT_TEAM = H87AHG4SAH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CreditCardBenefits/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -351,6 +369,8 @@
 				DEVELOPMENT_TEAM = H87AHG4SAH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CreditCardBenefits/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -435,6 +455,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 812C5DBB2EF3A67900E270B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFunctions;
+		};
+		81EAD0BF2F368F3C002CD994 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 812C5DBB2EF3A67900E270B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -7,22 +7,32 @@
 
 import SwiftUI
 import FirebaseAuth
+import FirebaseFunctions
 
 struct SettingsView: View {
-    @StateObject private var authService = AuthService()
-    @StateObject private var plaidService = PlaidService()
-
+    @EnvironmentObject var dataManager: AppDataManager
+    
     @State private var email = ""
     @State private var password = ""
     @State private var showingAlert = false
     @State private var alertMessage = ""
-    @State private var shouldPresentPlaid = false
+    @State private var plaidLinkToken: PlaidLinkToken?
 
-    // Helper to get view controller
-    @State private var rootViewController: UIViewController?
+    struct PlaidLinkToken: Identifiable {
+        let id = UUID()
+        let token: String
+    }
+    
+    private var authService: AuthService {
+        dataManager.authService
+    }
+    
+    private var plaidService: PlaidService {
+        dataManager.plaidService
+    }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 // Firebase Authentication Section
                 Section(header: Text("Firebase Authentication")) {
@@ -105,12 +115,12 @@ struct SettingsView: View {
                     if plaidService.isLinked {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Bank Connected")
-                                .foregroundColor(.green)
+                                .foregroundColor(plaidService.dataSource == .demo ? .orange : .green)
+                            Text(plaidService.dataSource == .demo ? "Demo Data Active" : "Bank Connected")
+                                .foregroundColor(plaidService.dataSource == .demo ? .orange : .green)
                         }
 
-                        Text("\(plaidService.transactions.count) transactions loaded")
+                        Text("\(plaidService.transactions.count) transactions loaded (\(plaidService.dataSource.displayName))")
                             .font(.caption)
                             .foregroundColor(.secondary)
 
@@ -121,9 +131,29 @@ struct SettingsView: View {
                                 showingAlert = true
                             }
                         }
+
+                        Button("Disconnect Bank") {
+                            Task {
+                                await plaidService.disconnect()
+                                await dataManager.clearAllData()
+                                alertMessage = "Bank disconnected"
+                                showingAlert = true
+                            }
+                        }
+                        .foregroundColor(.red)
                     } else {
                         Button("Connect Bank Account") {
-                            shouldPresentPlaid = true
+                            Task {
+                                do {
+                                    let token = try await plaidService.createLinkToken()
+                                    await MainActor.run {
+                                        plaidLinkToken = PlaidLinkToken(token: token)
+                                    }
+                                } catch {
+                                    alertMessage = "Error: \(error.localizedDescription)"
+                                    showingAlert = true
+                                }
+                            }
                         }
                         .disabled(!authService.isAuthenticated)
 
@@ -143,8 +173,121 @@ struct SettingsView: View {
                     }
                 }
 
-                // Test Functions Section
-                Section(header: Text("Test Functions")) {
+                // Transactions Section
+                if !plaidService.transactions.isEmpty {
+                    Section(header: Text("Transactions (\(plaidService.transactions.count))")) {
+                        ForEach(plaidService.transactions.prefix(10)) { transaction in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(transaction.merchant)
+                                        .font(.system(size: 14, weight: .semibold))
+                                    Spacer()
+                                    Text(String(format: "$%.2f", transaction.amount))
+                                        .font(.system(size: 14, weight: .medium))
+                                }
+
+                                HStack {
+                                    Text(transaction.dateString)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+
+                                    if let category = transaction.category {
+                                        Text("•")
+                                            .foregroundColor(.secondary)
+                                        Text(category)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+
+                        if plaidService.transactions.count > 10 {
+                            Text("Showing first 10 of \(plaidService.transactions.count) transactions")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                // Credit Cards Section - shows deduplicated cards from cardMatches
+                if !dataManager.cardMatches.isEmpty {
+                    Section(header: Text("Credit Cards (\(dataManager.cardMatches.count))")) {
+                        ForEach(dataManager.cardMatches) { match in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Image(systemName: match.isConfirmed ? "checkmark.circle.fill" : "questionmark.circle.fill")
+                                        .foregroundColor(match.isConfirmed ? .green : .orange)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        if let card = match.creditCard {
+                                            Text(card.name)
+                                                .font(.system(size: 14, weight: .semibold))
+                                        } else {
+                                            Text("Card not selected")
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(.orange)
+                                        }
+
+                                        HStack {
+                                            Text(match.plaidAccount.name)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            if let mask = match.plaidAccount.mask {
+                                                Text("•••• \(mask)")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                    }
+
+                                    Spacer()
+
+                                    if match.isConfirmed, let card = match.creditCard {
+                                        Text("\(card.benefits.count) benefits")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+
+                        Button("Re-process Accounts") {
+                            Task {
+                                await dataManager.processPlaidAccounts()
+                                alertMessage = "Found \(dataManager.cardMatches.count) credit card accounts"
+                                showingAlert = true
+                            }
+                        }
+
+                        if dataManager.cardMatches.contains(where: { !$0.isConfirmed }) {
+                            Button("Select Card Types") {
+                                dataManager.needsCardConfirmation = true
+                            }
+                            .foregroundColor(.blue)
+                        }
+                    }
+                }
+
+                #if DEBUG
+                // Developer Tools Section (only visible in debug builds)
+                Section(header: Text("Developer Tools")) {
+                    Button("Load Demo Data (No Plaid)") {
+                        Task {
+                            do {
+                                try await plaidService.populateDemoData()
+                                alertMessage = "✅ Demo data loaded!\n\nThis is simulated transaction data for testing, split between your Chase Reserve and Amex Blue Preferred cards.\n\nCheck the Home tab to see your demo subscriptions."
+                                showingAlert = true
+                            } catch {
+                                alertMessage = "Error: \(error.localizedDescription)"
+                                showingAlert = true
+                            }
+                        }
+                    }
+                    .disabled(!authService.isAuthenticated)
+
                     Button("Test Firebase Connection") {
                         testFirebaseConnection()
                     }
@@ -155,7 +298,45 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(!authService.isAuthenticated)
+
+                    Button("Fire Test Webhook") {
+                        Task {
+                            await fireTestWebhook()
+                        }
+                    }
+                    .disabled(!authService.isAuthenticated)
+
+                    Toggle("Show Onboarding Every Launch", isOn: Binding(
+                        get: { UserDefaults.standard.bool(forKey: "alwaysShowOnboarding") },
+                        set: { newValue in
+                            UserDefaults.standard.set(newValue, forKey: "alwaysShowOnboarding")
+                            if newValue {
+                                // Also reset it now
+                                dataManager.hasCompletedOnboarding = false
+                                UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+                            }
+                        }
+                    ))
+                    
+                    Button("Reset Onboarding Once") {
+                        dataManager.hasCompletedOnboarding = false
+                        UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+                        alertMessage = "Onboarding reset! Close and reopen the app."
+                        showingAlert = true
+                    }
+                    .foregroundColor(.orange)
+                    
+                    Button("Clear All Data") {
+                        Task {
+                            await plaidService.disconnect()
+                            await dataManager.clearAllData()
+                            alertMessage = "All data cleared"
+                            showingAlert = true
+                        }
+                    }
+                    .foregroundColor(.red)
                 }
+                #endif
             }
             .navigationTitle("Settings")
             .alert("Message", isPresented: $showingAlert) {
@@ -163,31 +344,23 @@ struct SettingsView: View {
             } message: {
                 Text(alertMessage)
             }
-            .onAppear {
-                // Get root view controller once on appear
-                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-                    rootViewController = windowScene.windows.first?.rootViewController
-                }
+            .fullScreenCover(item: $plaidLinkToken) { linkToken in
+                PlaidLinkView(
+                    linkToken: linkToken.token,
+                    onSuccess: { publicToken in
+                        plaidLinkToken = nil
+                        Task {
+                            await plaidService.exchangePublicToken(publicToken)
+                            // Process accounts and detect cards after linking
+                            await dataManager.processPlaidAccounts()
+                        }
+                    },
+                    onExit: {
+                        plaidLinkToken = nil
+                    }
+                )
+                .ignoresSafeArea()
             }
-            .onChange(of: shouldPresentPlaid) {
-                if shouldPresentPlaid {
-                    shouldPresentPlaid = false
-                    connectPlaidBank()
-                }
-            }
-        }
-    }
-
-    // MARK: - Helper Methods
-
-    private func connectPlaidBank() {
-        guard let vc = rootViewController else {
-            print("❌ No root view controller available")
-            return
-        }
-
-        Task {
-            await plaidService.presentPlaidLink(from: vc)
         }
     }
 
@@ -200,6 +373,22 @@ struct SettingsView: View {
             alertMessage = "⚠️ Firebase initialized but no user signed in"
         }
         showingAlert = true
+    }
+
+    private func fireTestWebhook() async {
+        do {
+            let result = try await Functions.functions().httpsCallable("fireTestWebhook").call()
+            if let data = result.data as? [String: Any],
+               let message = data["message"] as? String {
+                alertMessage = "✅ \(message)"
+            } else {
+                alertMessage = "✅ Webhook fired"
+            }
+            showingAlert = true
+        } catch {
+            alertMessage = "❌ Webhook error:\n\(error.localizedDescription)"
+            showingAlert = true
+        }
     }
 
     private func testCloudFunctions() async {
@@ -216,4 +405,5 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
+        .environmentObject(AppDataManager())
 }

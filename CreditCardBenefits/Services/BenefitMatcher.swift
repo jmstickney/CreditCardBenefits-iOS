@@ -7,16 +7,41 @@
 
 import Foundation
 
+enum BenefitMatcherError: LocalizedError {
+    case invalidSubscriptionData
+    case invalidCardData
+    case calculationError(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidSubscriptionData:
+            return "Invalid subscription data provided"
+        case .invalidCardData:
+            return "Invalid card data provided"
+        case .calculationError(let message):
+            return "Calculation error: \(message)"
+        }
+    }
+}
+
 class BenefitMatcher {
 
     // Match subscriptions with credit card benefits
     static func matchBenefits(
         subscriptions: [Subscription],
         userCards: [CreditCard]
-    ) -> [BenefitMatch] {
+    ) throws -> [BenefitMatch] {
+        guard !userCards.isEmpty else {
+            throw BenefitMatcherError.invalidCardData
+        }
+        
         var matches: [BenefitMatch] = []
 
         for subscription in subscriptions {
+            guard subscription.amount > 0 else {
+                continue // Skip invalid subscriptions
+            }
+            
             for card in userCards {
                 for benefit in card.benefits {
                     // Check if subscription category matches benefit
@@ -27,18 +52,24 @@ class BenefitMatcher {
 
                     // Check if merchant matches eligible merchants
                     if isMerchantEligible(subscription.merchant, for: benefit) {
-                        let savings = calculateSavings(subscription: subscription, benefit: benefit)
-                        let status = determineBenefitStatus(subscription: subscription, benefit: benefit)
+                        do {
+                            let savings = try calculateSavings(subscription: subscription, benefit: benefit)
+                            let status = determineBenefitStatus(subscription: subscription, benefit: benefit)
 
-                        let match = BenefitMatch(
-                            subscription: subscription,
-                            benefit: benefit,
-                            card: card,
-                            potentialSavings: savings,
-                            status: status
-                        )
+                            let match = BenefitMatch(
+                                subscription: subscription,
+                                benefit: benefit,
+                                card: card,
+                                potentialSavings: savings,
+                                status: status
+                            )
 
-                        matches.append(match)
+                            matches.append(match)
+                        } catch {
+                            // Log but continue processing other matches
+                            print("⚠️ Failed to calculate savings for \(subscription.merchant): \(error)")
+                            continue
+                        }
                     }
                 }
             }
@@ -64,7 +95,11 @@ class BenefitMatcher {
     }
 
     // Calculate potential savings
-    private static func calculateSavings(subscription: Subscription, benefit: CreditCardBenefit) -> Double {
+    private static func calculateSavings(subscription: Subscription, benefit: CreditCardBenefit) throws -> Double {
+        guard subscription.amount > 0, benefit.amount > 0 else {
+            throw BenefitMatcherError.calculationError("Invalid amounts for calculation")
+        }
+        
         let benefitMonthly = benefit.monthlyAmount
         let subscriptionMonthly = subscription.monthlyAmount
 
@@ -77,16 +112,21 @@ class BenefitMatcher {
 
     // Determine if benefit is being utilized
     private static func determineBenefitStatus(subscription: Subscription, benefit: CreditCardBenefit) -> BenefitStatus {
-        let savings = calculateSavings(subscription: subscription, benefit: benefit)
-        let benefitAnnual = benefit.annualAmount
+        do {
+            let savings = try calculateSavings(subscription: subscription, benefit: benefit)
+            let benefitAnnual = benefit.annualAmount
 
-        if savings >= benefitAnnual * 0.9 {
-            return .maximized
-        } else if savings >= benefitAnnual * 0.5 {
-            return .partial
+            if savings >= benefitAnnual * 0.9 {
+                return .maximized
+            } else if savings >= benefitAnnual * 0.5 {
+                return .partial
+            }
+
+            return .available
+        } catch {
+            // If calculation fails, default to available
+            return .available
         }
-
-        return .available
     }
 
     // Calculate total potential savings

@@ -7,7 +7,26 @@
 
 import Foundation
 
+enum SubscriptionDetectorError: LocalizedError {
+    case invalidTransactionData
+    case processingError(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidTransactionData:
+            return "Invalid transaction data provided"
+        case .processingError(let message):
+            return "Processing error: \(message)"
+        }
+    }
+}
+
 class SubscriptionDetector {
+    
+    // Constants for algorithm tuning
+    private static let AMOUNT_VARIANCE_THRESHOLD = 0.1  // 10% variance allowed
+    private static let INTERVAL_VARIANCE_DAYS = 7.0     // 7 days variance allowed
+    private static let MIN_TRANSACTIONS_FOR_DETECTION = 2
 
     // Common subscription merchant patterns
     private struct MerchantPattern {
@@ -66,7 +85,18 @@ class SubscriptionDetector {
     ]
 
     // Detect subscriptions from transactions
-    static func detectSubscriptions(from transactions: [Transaction]) -> [Subscription] {
+    static func detectSubscriptions(from transactions: [Transaction]) throws -> [Subscription] {
+        guard !transactions.isEmpty else {
+            return [] // Empty array is valid, just no subscriptions found
+        }
+        
+        // Validate transactions
+        for transaction in transactions {
+            guard transaction.amount > 0 else {
+                throw SubscriptionDetectorError.processingError("Invalid transaction amount: \(transaction.amount)")
+            }
+        }
+        
         let merchantGroups = groupByMerchant(transactions)
         var subscriptions: [Subscription] = []
 
@@ -138,12 +168,14 @@ class SubscriptionDetector {
 
     // Detect if transactions are recurring
     private static func isRecurring(_ transactions: [Transaction]) -> Bool {
-        guard transactions.count >= 2 else { return false }
+        guard transactions.count >= MIN_TRANSACTIONS_FOR_DETECTION else { return false }
 
-        // Check if amounts are consistent (within 10% variance)
+        // Check if amounts are consistent
         let amounts = transactions.map { $0.amount }
         let avgAmount = amounts.reduce(0, +) / Double(amounts.count)
-        let amountsConsistent = amounts.allSatisfy { abs($0 - avgAmount) / avgAmount < 0.1 }
+        let amountsConsistent = amounts.allSatisfy { 
+            abs($0 - avgAmount) / avgAmount < AMOUNT_VARIANCE_THRESHOLD 
+        }
 
         guard amountsConsistent else { return false }
 
@@ -153,8 +185,8 @@ class SubscriptionDetector {
 
         let avgInterval = intervals.reduce(0, +) / Double(intervals.count)
 
-        // Consider it recurring if intervals are consistent (within 7 days variance)
-        return intervals.allSatisfy { abs($0 - avgInterval) < 7 }
+        // Consider it recurring if intervals are consistent
+        return intervals.allSatisfy { abs($0 - avgInterval) < INTERVAL_VARIANCE_DAYS }
     }
 
     // Calculate intervals between transactions in days
