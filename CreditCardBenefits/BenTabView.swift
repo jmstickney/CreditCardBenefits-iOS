@@ -128,8 +128,9 @@ struct BenTabView: View {
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = UIColor(Ben.Color.cream)
 
-        // Remove the default top separator line, replace with a subtle one
-        appearance.shadowColor = UIColor(Ben.Color.sandBorder)
+        // Completely remove separator/shadow for flat sticky nav (Amex style)
+        appearance.shadowColor = nil
+        appearance.shadowImage = nil
 
         // Unselected item color
         let unselected = UITabBarItemAppearance()

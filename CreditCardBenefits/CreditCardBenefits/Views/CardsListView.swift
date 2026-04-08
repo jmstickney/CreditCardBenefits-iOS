@@ -27,17 +27,25 @@ struct CardsListView: View {
                 if dataManager.userCards.isEmpty {
                     EmptyCardsView()
                 } else {
-                    ForEach(dataManager.userCards) { card in
-                        NavigationLink(destination: SwipeableCardDetailView(
-                            initialCard: card,
-                            allCards: dataManager.userCards
-                        )) {
-                            CardListRow(
-                                card: card,
-                                utilizations: dataManager.utilizationService.utilizationsForCard(card.id)
-                            )
+                    VStack(spacing: 0) {
+                        ForEach(dataManager.userCards) { card in
+                            NavigationLink(destination: SwipeableCardDetailView(
+                                initialCard: card,
+                                allCards: dataManager.userCards
+                            )) {
+                                CardListRow(
+                                    card: card,
+                                    utilizations: dataManager.utilizationService.utilizationsForCard(card.id)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            // Separator between cards (except last one)
+                            if card.id != dataManager.userCards.last?.id {
+                                Divider()
+                                    .background(Ben.Color.sandBorder)
+                            }
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                 }
 
@@ -110,8 +118,8 @@ private struct CardListRow: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(Ben.Color.textMuted.opacity(0.5))
         }
-        .benCard()
-        .padding(.horizontal, Ben.Spacing.screenH)
+        .padding(Ben.Spacing.lg)
+        .background(Ben.Color.sand)
     }
 }
 
