@@ -39,7 +39,7 @@ struct OnboardingView: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
             .indexViewStyle(.page(backgroundDisplayMode: .never))
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
     }
 }
 
@@ -200,7 +200,7 @@ struct ConnectCardsStepView: View {
             linkToken = try await dataManager.plaidService.createLinkToken()
             showingPlaidLink = true
         } catch {
-            print("Error creating link token: \(error)")
+            benLog("Error creating link token: \(error)")
         }
         
         isConnecting = false

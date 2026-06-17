@@ -71,9 +71,15 @@ class RecommendationEngine {
         for card in userCards {
             for benefit in card.benefits {
                 // Find utilization for this benefit
-                let utilization = utilizations.first {
+                // Pick the utilization for the current period (the one containing today),
+                // falling back to the most recent one. Without this filter, an old empty
+                // utilization could mask a current period that has activity.
+                let matchingUtils = utilizations.filter {
                     $0.cardId == card.id && $0.benefitId == benefit.id
                 }
+                let now = Date()
+                let utilization = matchingUtils.first(where: { $0.periodStart <= now && now <= $0.periodEnd })
+                    ?? matchingUtils.sorted(by: { $0.periodStart > $1.periodStart }).first
                 
                 // Check if unused (0% utilization)
                 let isUnused = (utilization?.amountUtilized ?? 0) == 0
@@ -173,9 +179,15 @@ class RecommendationEngine {
         for card in userCards {
             for benefit in card.benefits where benefit.requiresEnrollment {
                 // Check if already enrolled/used
-                let utilization = utilizations.first {
+                // Pick the utilization for the current period (the one containing today),
+                // falling back to the most recent one. Without this filter, an old empty
+                // utilization could mask a current period that has activity.
+                let matchingUtils = utilizations.filter {
                     $0.cardId == card.id && $0.benefitId == benefit.id
                 }
+                let now = Date()
+                let utilization = matchingUtils.first(where: { $0.periodStart <= now && now <= $0.periodEnd })
+                    ?? matchingUtils.sorted(by: { $0.periodStart > $1.periodStart }).first
                 
                 let isEnrolled = (utilization?.amountUtilized ?? 0) > 0 || 
                                  (utilization?.isManuallyMarked ?? false)

@@ -50,7 +50,13 @@ struct CreditCardsData {
                     eligibleMerchants: [
                         "AMEX ENTERTAINMENT CREDIT", "ENTERTAINMENT CREDIT",
                         "PLATINUM DIGITAL ENTERTAINMENT", "DIGITAL ENTERTAINMENT CREDIT",
-                        "Disney+", "Disney Plus", "Disney Bundle", "DisneyPlus", 
+                        "PLATINUM DIGITAL ENTERTAINMENT CREDIT",
+                        "AMEX PLATINUM DIGITAL ENTERTAINMENT",
+                        "AMERICAN EXPRESS ENTERTAINMENT",
+                        "AMEX DIGITAL ENTERTAINMENT",
+                        "AX PLATINUM DIGITAL",
+                        "AMEX PLAT DIGITAL",
+                        "Disney+", "Disney Plus", "Disney Bundle", "DisneyPlus",
                         "Hulu", "ESPN+", "ESPN Plus",
                         "Peacock", "The New York Times", "NYT", "Audible",
                         "DISNEY", "DISNEYPLUS"
@@ -263,7 +269,10 @@ struct CreditCardsData {
                         "TRAVEL CREDIT $300/YEAR", "TRAVEL CREDIT $300/YR",
                         "TRAVEL CREDIT", "CHASE TRAVEL CREDIT",
                         "CSR TRAVEL CREDIT", "SAPPHIRE TRAVEL CREDIT",
-                        "TRAVEL CREDIT $300", "$300 TRAVEL CREDIT"
+                        "TRAVEL CREDIT $300", "$300 TRAVEL CREDIT",
+                        "ANNUAL TRAVEL CREDIT", "RESERVE TRAVEL CREDIT",
+                        "CHASE SAPPHIRE TRAVEL", "ULTIMATE REWARDS TRAVEL CREDIT",
+                        "TRAVEL STATEMENT CREDIT", "STATEMENT CREDIT - TRAVEL"
                     ],
                     category: "travel",
                     conditions: "Automatically applied to travel purchases",
@@ -273,7 +282,7 @@ struct CreditCardsData {
                     requiresEnrollment: false,
                     matchCreditTransactions: true
                 ),
-                
+
                 // Semi-Annual Credits
                 CreditCardBenefit(
                     id: "csr-the-edit",
@@ -308,32 +317,45 @@ struct CreditCardsData {
                     type: .diningCredit,
                     name: "OpenTable Credit",
                     description: "$150 every 6 months ($300/year)",
-                    amount: 150,
+                    amount: 300,
                     frequency: .annual,
                     eligibleMerchants: [
-                        "OPENTABLE", "OpenTable", "OPEN TABLE"
+                        "OPENTABLE", "OpenTable", "OPEN TABLE",
+                        "OPENTABLE CREDIT", "OPEN TABLE CREDIT",
+                        "OPENTABLE STATEMENT CREDIT",
+                        "DINING CREDIT $300/YEAR", "DINING CREDIT $300/YR",
+                        "DINING CREDIT $300", "$300 DINING CREDIT",
+                        "DINING CREDIT $150", "$150 DINING CREDIT",
+                        "DINING CREDIT", "CHASE DINING CREDIT",
+                        "CSR DINING CREDIT", "SAPPHIRE DINING CREDIT",
+                        "ANNUAL DINING CREDIT", "RESERVE DINING CREDIT",
+                        "DINING STATEMENT CREDIT", "STATEMENT CREDIT - DINING"
                     ],
                     category: "dining",
                     conditions: "$150 every 6 months through OpenTable",
                     period: .calendarYear,
-                    canAutoDetect: false,
-                    requiresEnrollment: false
+                    canAutoDetect: true,
+                    requiresEnrollment: false,
+                    matchCreditTransactions: true
                 ),
                 CreditCardBenefit(
                     id: "csr-stubhub",
                     type: .subscriptionCredit,
                     name: "StubHub Credit",
                     description: "$150 every 6 months ($300/year)",
-                    amount: 150,
+                    amount: 300,
                     frequency: .annual,
                     eligibleMerchants: [
-                        "STUBHUB", "StubHub", "STUB HUB"
+                        "STUBHUB CREDIT $300/YEAR", "STUBHUB CREDIT $300/YR",
+                        "STUBHUB CREDIT $150/6MONTH", "STUBHUB CREDIT $150/6 MONTH",
+                        "STUBHUB STATEMENT CREDIT", "STATEMENT CREDIT - STUBHUB"
                     ],
                     category: "entertainment",
                     conditions: "$150 every 6 months on StubHub",
                     period: .calendarYear,
-                    canAutoDetect: false,
-                    requiresEnrollment: false
+                    canAutoDetect: true,
+                    requiresEnrollment: false,
+                    matchCreditTransactions: true
                 ),
                 
                 // Monthly Credits

@@ -71,28 +71,28 @@ struct CompactCardListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Ben.Color.forest.ignoresSafeArea()
-                
+                Ben.Color.cream.ignoresSafeArea()
+
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Wednesday, March 18")
                             .font(Ben.Font.caption)
-                            .foregroundColor(Ben.Color.cream.opacity(0.6))
+                            .foregroundColor(Ben.Color.textMuted)
                             .padding(.horizontal, 20)
                             .padding(.top, 20)
-                        
+
                         Text("Overview")
                             .font(Ben.Font.screenTitle)
-                            .foregroundColor(Ben.Color.cream)
+                            .foregroundColor(Ben.Color.textPrimary)
                             .padding(.horizontal, 20)
-                        
+
                         Divider()
-                            .background(Ben.Color.cream.opacity(0.2))
+                            .background(Ben.Color.sandBorder)
                             .padding(.vertical, 16)
-                        
+
                         Text("Cards")
                             .font(Ben.Font.bodyLarge)
-                            .foregroundColor(Ben.Color.cream)
+                            .foregroundColor(Ben.Color.textPrimary)
                             .padding(.horizontal, 20)
                         
                         // Card list
@@ -116,10 +116,10 @@ struct CompactCardListView: View {
                     Button("Log out") {
                         // Handle logout
                     }
-                    .foregroundColor(Ben.Color.mint)
+                    .foregroundColor(Ben.Color.forest)
                 }
             }
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(.light)
         }
     }
 }
@@ -139,30 +139,30 @@ struct CompactCardRow: View {
         HStack(spacing: 16) {
             // Card thumbnail
             cardThumbnail
-            
+
             VStack(alignment: .leading, spacing: 6) {
                 Text(totalUtilized.asCurrency())
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(Ben.Color.cream)
-                
+                    .foregroundColor(Ben.Color.textPrimary)
+
                 Text(card.name)
                     .font(Ben.Font.bodySmall)
-                    .foregroundColor(Ben.Color.cream.opacity(0.6))
+                    .foregroundColor(Ben.Color.textMuted)
                     .lineLimit(1)
             }
-            
+
             Spacer()
-            
+
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Ben.Color.cream.opacity(0.3))
+                .foregroundColor(Ben.Color.textMuted.opacity(0.5))
         }
         .padding(16)
-        .background(Ben.Color.cream.opacity(0.08))
+        .background(Ben.Color.sand)
         .cornerRadius(12)
         .padding(.horizontal, 20)
     }
-    
+
     private var cardThumbnail: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8)
@@ -171,10 +171,10 @@ struct CompactCardRow: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ))
-            
+
             Text(card.issuer.rawValue.uppercased())
                 .font(.system(size: 10, weight: .bold))
-                .foregroundColor(Ben.Color.cream.opacity(0.8))
+                .foregroundColor(.white.opacity(0.8))
         }
         .frame(width: 80, height: 50)
     }

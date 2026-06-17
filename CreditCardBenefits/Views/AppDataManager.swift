@@ -38,6 +38,7 @@ class AppDataManager: ObservableObject {
 
     // State restoration
     @Published var isRestoring = false
+    @Published var isRestoringState = false
 
     init() {
         // Initialize with empty stats
@@ -71,18 +72,22 @@ class AppDataManager: ObservableObject {
 
     /// Restores app state on launch — loads cache instantly, then refreshes from network
     func restoreState() async {
+        isRestoringState = true
+
         // Phase 1: Load cached data immediately (synchronous, sub-100ms)
         loadFromCache()
 
         let hasCachedData = !plaidService.transactions.isEmpty
 
         guard authService.isAuthenticated else {
-            print("ℹ️ User not authenticated, showing cached data only")
+            benLog("ℹ️ User not authenticated, showing cached data only")
+            isRestoringState = false
             return
         }
 
-        guard let userId = authService.user?.uid else {
-            print("⚠️ No user ID available for state restoration")
+        guard authService.user?.uid != nil else {
+            benLog("⚠️ No user ID available for state restoration")
+            isRestoringState = false
             return
         }
 
@@ -92,24 +97,23 @@ class AppDataManager: ObservableObject {
             isRestoring = true
         }
 
-        print("🔄 Refreshing from network...")
+        benLog("🔄 Refreshing from network...")
 
         let hasConnection = await plaidService.checkExistingConnection()
 
         if hasConnection {
             await plaidService.fetchTransactions()
+            // processPlaidAccounts() calls loadData() which processes utilizations,
+            // matches benefits, calculates stats, and saves to cache — all in one pass.
             await processPlaidAccounts()
-            await utilizationService.loadUtilizations(for: userId)
 
-            // Persist fresh data to cache
-            saveToCache()
-
-            print("✅ State restored: \(plaidService.transactions.count) transactions, \(userCards.count) cards")
+            benLog("✅ State restored: \(plaidService.transactions.count) transactions, \(userCards.count) cards")
         } else {
-            print("ℹ️ No existing connection to restore")
+            benLog("ℹ️ No existing connection to restore")
         }
 
         isRestoring = false
+        isRestoringState = false
     }
 
     // MARK: - Local Cache
@@ -131,7 +135,9 @@ class AppDataManager: ObservableObject {
             plaidService.dataSource = dataSource
         }
         if let cards = cache.load([CreditCard].self, for: .userCards) {
-            userCards = cards
+            // Rehydrate from CreditCardsData so any benefits added in code updates
+            // appear immediately, instead of being stuck at whatever was cached.
+            userCards = cards.compactMap { CreditCardsData.getCard(by: $0.id) ?? $0 }
         }
         if let subs = cache.load([Subscription].self, for: .subscriptions) {
             subscriptions = subs
@@ -150,7 +156,7 @@ class AppDataManager: ObservableObject {
         }
 
         if !plaidService.transactions.isEmpty {
-            print("✅ Loaded cached data: \(plaidService.transactions.count) transactions, \(userCards.count) cards")
+            benLog("✅ Loaded cached data: \(plaidService.transactions.count) transactions, \(userCards.count) cards")
         }
     }
 
@@ -203,7 +209,7 @@ class AppDataManager: ObservableObject {
     /// Processes benefit utilizations from transactions
     func processUtilizations(from transactions: [Transaction]) async {
         guard let userId = authService.user?.uid else {
-            print("⚠️ No authenticated user for utilization processing")
+            benLog("⚠️ No authenticated user for utilization processing")
             return
         }
 
@@ -222,7 +228,7 @@ class AppDataManager: ObservableObject {
         do {
             try await utilizationService.saveAllUtilizations(userId: userId)
         } catch {
-            print("❌ Failed to save utilizations: \(error)")
+            benLog("❌ Failed to save utilizations: \(error)")
         }
 
         // Recalculate stats with utilization data
@@ -231,7 +237,7 @@ class AppDataManager: ObservableObject {
         // Persist to local cache
         saveToCache()
 
-        print("✅ Processed utilizations for \(userCards.count) cards")
+        benLog("✅ Processed utilizations for \(userCards.count) cards")
     }
 
     /// Refreshes all data from Plaid
@@ -278,6 +284,15 @@ class AppDataManager: ObservableObject {
             utilizations: utilizationService.utilizations,
             transactions: plaidService.transactions
         )
+
+        // Reschedule notification reminders
+        Task {
+            await NotificationManager.shared.scheduleReminders(
+                utilizations: utilizationService.utilizations,
+                userCards: userCards,
+                cardMatches: cardMatches
+            )
+        }
     }
 
     // MARK: - Benefit Utilization
@@ -354,19 +369,19 @@ class AppDataManager: ObservableObject {
     /// No auto-detection - user explicitly picks which card each account is
     func processPlaidAccounts() async {
         guard let userId = authService.user?.uid else {
-            print("⚠️ No authenticated user for card processing")
+            benLog("⚠️ No authenticated user for card processing")
             return
         }
 
-        print("🔄 Processing Plaid accounts...")
-        print("📊 Total accounts from Plaid: \(plaidService.accounts.count)")
+        benLog("🔄 Processing Plaid accounts...")
+        benLog("📊 Total accounts from Plaid: \(plaidService.accounts.count)")
         for account in plaidService.accounts {
-            print("   - \(account.name) (type: \(account.type), subtype: \(account.subtype ?? "nil"))")
+            benLog("   - \(account.name) (type: \(account.type), subtype: \(account.subtype ?? "nil"))")
         }
 
         // Load existing mappings from Firestore
         await cardMappingService.loadMappings(for: userId)
-        print("📋 Loaded \(cardMappingService.mappings.count) saved card mappings")
+        benLog("📋 Loaded \(cardMappingService.mappings.count) saved card mappings")
 
         // Create match entries for all credit card accounts
         cardMatches = CardDetector.createMatches(from: plaidService.accounts)
@@ -384,12 +399,13 @@ class AppDataManager: ObservableObject {
                 // Found saved mapping - apply it
                 cardMatches[i].creditCard = card
                 cardMatches[i].isConfirmed = true
+                cardMatches[i].anniversaryDate = existingMapping.anniversaryDate
                 confirmedCards.append(card)
-                print("✅ Restored mapping: \(cardMatches[i].plaidAccount.name) → \(card.name)")
+                benLog("✅ Restored mapping: \(cardMatches[i].plaidAccount.name) → \(card.name)")
             } else {
                 // No mapping - needs user selection
                 hasUnconfirmedAccounts = true
-                print("❓ Needs selection: \(cardMatches[i].plaidAccount.name)")
+                benLog("❓ Needs selection: \(cardMatches[i].plaidAccount.name)")
             }
         }
 
@@ -406,9 +422,9 @@ class AppDataManager: ObservableObject {
         // Reload data with confirmed cards
         loadData(from: plaidService.transactions)
 
-        print("✅ Processed \(cardMatches.count) accounts, \(userCards.count) confirmed cards")
+        benLog("✅ Processed \(cardMatches.count) accounts, \(userCards.count) confirmed cards")
         if hasUnconfirmedAccounts {
-            print("📋 Card selection needed for \(cardMatches.filter { !$0.isConfirmed }.count) accounts")
+            benLog("📋 Card selection needed for \(cardMatches.filter { !$0.isConfirmed }.count) accounts")
         }
     }
 
@@ -424,7 +440,8 @@ class AppDataManager: ObservableObject {
             plaidAccountMask: plaidAccount.mask,
             isAutoDetected: false,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
+            anniversaryDate: anniversaryDate
         )
 
         do {
@@ -451,7 +468,7 @@ class AppDataManager: ObservableObject {
             // Persist to local cache
             saveToCache()
 
-            print("✅ User assigned \(plaidAccount.name) → \(creditCard?.name ?? "Not in database")")
+            benLog("✅ User assigned \(plaidAccount.name) → \(creditCard?.name ?? "Not in database")")
         } catch {
             self.error = .dataProcessing("Failed to save card mapping: \(error.localizedDescription)")
             self.showError = true
@@ -460,19 +477,30 @@ class AppDataManager: ObservableObject {
     
     /// Updates the anniversary date for a card
     func updateAnniversaryDate(_ date: Date, for plaidAccount: PlaidAccount) async {
+        guard let userId = authService.user?.uid else { return }
+
         // Update in cardMatches
         if let index = cardMatches.firstIndex(where: { $0.plaidAccount.id == plaidAccount.id }) {
             cardMatches[index].anniversaryDate = date
-            
+
+            // Persist anniversary date to Firestore via CardMapping
+            if var existingMapping = cardMappingService.mappings[plaidAccount.id] {
+                existingMapping.anniversaryDate = date
+                try? await cardMappingService.saveMapping(existingMapping, userId: userId)
+            }
+
             // Refresh benefit calculations with new anniversary date
             let _ = await utilizationService.processTransactions(
                 plaidService.transactions,
                 userCards: userCards,
-                userId: authService.user?.uid ?? "",
+                userId: userId,
                 cardMatches: cardMatches
             )
-            
-            print("✅ Updated anniversary date for \(plaidAccount.name) to \(date)")
+
+            // Update local cache
+            saveToCache()
+
+            benLog("✅ Updated anniversary date for \(plaidAccount.name) to \(date)")
         }
     }
 
@@ -495,6 +523,11 @@ class AppDataManager: ObservableObject {
     func completeOnboarding() {
         hasCompletedOnboarding = true
         UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+
+        // Request notification permission after onboarding
+        Task {
+            let _ = await NotificationManager.shared.requestPermission()
+        }
     }
     
     /// Handles successful Plaid connection

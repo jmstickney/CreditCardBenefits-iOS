@@ -44,13 +44,13 @@ class BenefitUtilizationService: ObservableObject {
                 self.isLoading = false
             }
 
-            print("✅ Loaded \(loadedUtilizations.count) benefit utilizations")
+            benLog("✅ Loaded \(loadedUtilizations.count) benefit utilizations")
 
         } catch {
             await MainActor.run {
                 self.isLoading = false
             }
-            print("❌ Error loading utilizations: \(error.localizedDescription)")
+            benLog("❌ Error loading utilizations: \(error.localizedDescription)")
         }
     }
 
@@ -75,49 +75,54 @@ class BenefitUtilizationService: ObservableObject {
             let cardTransactions = transactions.filter { accountIds.contains($0.accountId) }
             
             for benefit in card.benefits where benefit.canAutoDetect {
-                // Get current period for this benefit, passing anniversary date if available
-                let (periodStart, periodEnd) = BenefitPeriodHelper.currentPeriod(
+                // Get all periods that span the transaction history, not just the current one
+                let earliestDate = cardTransactions.map { $0.date }.min() ?? Date()
+                let periods = BenefitPeriodHelper.allPeriods(
                     for: benefit.period,
+                    from: earliestDate,
                     cardAnniversaryDate: anniversaryDate
                 )
 
-                // Find matching transactions within this period (only from this card)
-                let matchingTransactions = findMatchingTransactions(
-                    cardTransactions,
-                    for: benefit,
-                    in: periodStart...periodEnd
-                )
+                for (periodStart, periodEnd) in periods {
+                    // Find matching transactions within this period (only from this card)
+                    let matchingTransactions = findMatchingTransactions(
+                        cardTransactions,
+                        for: benefit,
+                        in: periodStart...periodEnd
+                    )
 
-                // Calculate total utilized amount
-                let totalUtilized = matchingTransactions.reduce(0.0) { $0 + $1.amount }
-                let cappedUtilized = min(totalUtilized, benefit.annualAmount)
+                    // Calculate total utilized amount
+                    let totalUtilized = matchingTransactions.reduce(0.0) { $0 + $1.amount }
+                    let periodValue = BenefitPeriodHelper.periodValue(for: benefit, periodStart: periodStart, periodEnd: periodEnd)
+                    let cappedUtilized = min(totalUtilized, periodValue)
 
-                // Get or create utilization record
-                let existingUtilization = utilizations.first {
-                    $0.benefitId == benefit.id &&
-                    $0.cardId == card.id &&
-                    $0.periodStart == periodStart
+                    // Get or create utilization record
+                    let existingUtilization = utilizations.first {
+                        $0.benefitId == benefit.id &&
+                        $0.cardId == card.id &&
+                        $0.periodStart == periodStart
+                    }
+
+                    let utilization = BenefitUtilization(
+                        id: existingUtilization?.id ?? UUID().uuidString,
+                        benefitId: benefit.id,
+                        cardId: card.id,
+                        userId: userId,
+                        periodStart: periodStart,
+                        periodEnd: periodEnd,
+                        periodType: benefit.period,
+                        totalValue: periodValue,
+                        amountUtilized: cappedUtilized,
+                        matchedTransactionIds: matchingTransactions.map { $0.id },
+                        isManuallyMarked: existingUtilization?.isManuallyMarked ?? false,
+                        manualNote: existingUtilization?.manualNote,
+                        manualClaimDate: existingUtilization?.manualClaimDate,
+                        createdAt: existingUtilization?.createdAt ?? Date(),
+                        updatedAt: Date()
+                    )
+
+                    newUtilizations.append(utilization)
                 }
-
-                let utilization = BenefitUtilization(
-                    id: existingUtilization?.id ?? UUID().uuidString,
-                    benefitId: benefit.id,
-                    cardId: card.id,
-                    userId: userId,
-                    periodStart: periodStart,
-                    periodEnd: periodEnd,
-                    periodType: benefit.period,
-                    totalValue: BenefitPeriodHelper.periodValue(for: benefit, periodStart: periodStart, periodEnd: periodEnd),
-                    amountUtilized: cappedUtilized,
-                    matchedTransactionIds: matchingTransactions.map { $0.id },
-                    isManuallyMarked: existingUtilization?.isManuallyMarked ?? false,
-                    manualNote: existingUtilization?.manualNote,
-                    manualClaimDate: existingUtilization?.manualClaimDate,
-                    createdAt: existingUtilization?.createdAt ?? Date(),
-                    updatedAt: Date()
-                )
-
-                newUtilizations.append(utilization)
             }
 
             // Also create records for non-auto-detect benefits (so they show in UI)
@@ -172,21 +177,27 @@ class BenefitUtilizationService: ObservableObject {
             guard dateRange.contains(transaction.date) else { return false }
             
             // Filter by transaction type (credit vs purchase)
-            // If benefit expects credits, only match credit transactions
-            // If benefit expects purchases, only match purchase transactions
-            if benefit.matchCreditTransactions != transaction.isCredit {
+            // Benefits that match credits (statement credits) should accept both credit
+            // and debit transactions, since issuers like Amex often report statement
+            // credits as positive amounts in Plaid. The merchant name is specific enough
+            // to avoid false positives. For purchase-matching benefits, only match purchases.
+            if !benefit.matchCreditTransactions && transaction.isCredit {
                 return false
             }
 
-            // Strategy 1: Merchant name matching
+            // Strategy 1: Merchant name matching (check both name and merchant_name from Plaid)
+            // One-directional: the eligible pattern must appear as a substring of the
+            // transaction merchant. The reverse direction (eligible.contains(merchant))
+            // caused false positives, e.g. eligible "STUBHUB CREDIT $300/YEAR" matching
+            // a regular "STUBHUB" merchant purchase.
             if let merchants = benefit.eligibleMerchants {
-                let normalizedMerchant = transaction.merchant.lowercased()
-                if merchants.contains(where: { eligible in
-                    let normalizedEligible = eligible.lowercased()
-                    return normalizedMerchant.contains(normalizedEligible) ||
-                           normalizedEligible.contains(normalizedMerchant)
-                }) {
-                    return true
+                let merchantNames = [transaction.merchant.lowercased()] + (transaction.merchantName.map { [$0.lowercased()] } ?? [])
+                for normalizedMerchant in merchantNames {
+                    if merchants.contains(where: { eligible in
+                        normalizedMerchant.contains(eligible.lowercased())
+                    }) {
+                        return true
+                    }
                 }
             }
 
@@ -260,7 +271,7 @@ class BenefitUtilizationService: ObservableObject {
             }
         }
 
-        print("✅ Marked benefit \(benefitId) as used: $\(amount)")
+        benLog("✅ Marked benefit \(benefitId) as used: $\(amount)")
     }
 
     // MARK: - Save Utilization
@@ -274,7 +285,7 @@ class BenefitUtilizationService: ObservableObject {
             .document(utilization.id)
             .setData(try Firestore.Encoder().encode(utilization))
 
-        print("✅ Saved utilization \(utilization.id)")
+        benLog("✅ Saved utilization \(utilization.id)")
     }
 
     /// Saves all utilizations to Firestore
@@ -292,19 +303,24 @@ class BenefitUtilizationService: ObservableObject {
         }
 
         try await batch.commit()
-        print("✅ Saved \(utilizations.count) utilizations")
+        benLog("✅ Saved \(utilizations.count) utilizations")
     }
 
     // MARK: - Computed Stats
 
-    /// Gets total utilized value across all benefits
+    /// Total benefits used so far this year. Rolls monthly periods up to YTD and
+    /// counts the current-period record for annual / cardmember-year / one-time benefits.
+    /// Avoids the multi-period double-counting that a naive sum would produce.
     var totalUtilized: Double {
-        utilizations.reduce(0) { $0 + $1.amountUtilized }
+        BenefitPeriodHelper.yearToDateUtilized(utilizations)
     }
 
-    /// Gets total potential value across all benefits
+    /// Gets total potential value across all benefits (current period only).
     var totalPotentialValue: Double {
-        utilizations.reduce(0) { $0 + $1.totalValue }
+        let now = Date()
+        return utilizations
+            .filter { $0.periodStart <= now && now <= $0.periodEnd }
+            .reduce(0) { $0 + $1.totalValue }
     }
 
     /// Gets overall utilization percentage
@@ -333,9 +349,14 @@ class BenefitUtilizationService: ObservableObject {
         utilizations.filter { $0.cardId == cardId }
     }
 
-    /// Gets utilization for a specific benefit
+    /// Gets utilization for a specific benefit (prefers the current period, falls back to most recent)
     func utilizationForBenefit(_ benefitId: String, cardId: String) -> BenefitUtilization? {
-        utilizations.first { $0.benefitId == benefitId && $0.cardId == cardId }
+        let matching = utilizations.filter { $0.benefitId == benefitId && $0.cardId == cardId }
+        let now = Date()
+        if let current = matching.first(where: { $0.periodStart <= now && now <= $0.periodEnd }) {
+            return current
+        }
+        return matching.sorted(by: { $0.periodStart > $1.periodStart }).first
     }
 
     /// Clears all utilization data

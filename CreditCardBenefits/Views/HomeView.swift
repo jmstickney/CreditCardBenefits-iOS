@@ -15,7 +15,7 @@ struct HomeView: View {
     
     // Computed properties for HomeHeaderView
     private var totalUsedValue: Double {
-        dataManager.utilizationService.utilizations.reduce(0) { $0 + $1.amountUtilized }
+        BenefitPeriodHelper.yearToDateUtilized(dataManager.utilizationService.utilizations)
     }
     
     private var totalAnnualFees: Double {
@@ -40,7 +40,7 @@ struct HomeView: View {
                     )
                     
                     // Accounts section
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Text("Accounts")
                                     .font(Ben.Font.bodyLarge)
@@ -64,18 +64,29 @@ struct HomeView: View {
                             if dataManager.userCards.isEmpty {
                                 EmptyAccountsView()
                             } else {
-                                ForEach(dataManager.userCards) { card in
-                                    NavigationLink(destination: SwipeableCardDetailView(
-                                        initialCard: card,
-                                        allCards: dataManager.userCards
-                                    )) {
-                                        AmexStyleCardRow(
-                                            card: card,
-                                            utilizations: dataManager.utilizationService.utilizationsForCard(card.id)
-                                        )
+                                VStack(spacing: 0) {
+                                    ForEach(Array(dataManager.userCards.enumerated()), id: \.element.id) { index, card in
+                                        NavigationLink(destination: SwipeableCardDetailView(
+                                            initialCard: card,
+                                            allCards: dataManager.userCards
+                                        )) {
+                                            AmexStyleCardRow(
+                                                card: card,
+                                                utilizations: dataManager.utilizationService.utilizationsForCard(card.id)
+                                            )
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+
+                                        if index < dataManager.userCards.count - 1 {
+                                            Divider()
+                                                .padding(.leading, 88)
+                                        }
                                     }
-                                    .buttonStyle(PlainButtonStyle())
                                 }
+                                .background(Ben.Color.sand)
+                                .cornerRadius(Ben.Radius.lg)
+                                .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+                                .padding(.horizontal, 20)
                             }
                     }
 
@@ -103,12 +114,12 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .preferredColorScheme(.light)
             .onAppear {
-                if !dataManager.plaidService.transactions.isEmpty {
+                if !dataManager.isRestoringState && !dataManager.plaidService.transactions.isEmpty {
                     dataManager.loadData(from: dataManager.plaidService.transactions)
                 }
             }
             .onChange(of: dataManager.plaidService.transactions) { _, newTransactions in
-                if !newTransactions.isEmpty {
+                if !dataManager.isRestoringState && !newTransactions.isEmpty {
                     dataManager.loadData(from: newTransactions)
                 }
             }
@@ -139,7 +150,7 @@ struct HomeView: View {
                 }
             }
             .onChange(of: dataManager.plaidService.accounts) { _, newAccounts in
-                if !newAccounts.isEmpty {
+                if !dataManager.isRestoringState && !newAccounts.isEmpty {
                     Task {
                         await dataManager.processPlaidAccounts()
                 }
@@ -181,7 +192,7 @@ struct HomeView: View {
             }
             
         default:
-            print("Recommendation tapped: \(recommendation.title)")
+            benLog("Recommendation tapped: \(recommendation.title)")
         }
     }
 }
@@ -238,7 +249,8 @@ struct AmexStyleCardRow: View {
             
             Spacer()
         }
-        .benCard()
+        .contentShape(Rectangle())
+        .padding(Ben.Spacing.md)
     }
 }
 

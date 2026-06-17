@@ -10,7 +10,7 @@ enum Ben {
     // MARK: - Colors
     enum Color {
         // Primary palette
-        /// Deep forest green — primary actions, key UI elements, hero backgrounds
+        /// Deep forest green — primary actions, key UI elements, brand accent
         static let forest      = SwiftUI.Color(red: 0.102, green: 0.239, blue: 0.169) // #1A3D2B
         /// Light mint — text on forest, success states, positive accents
         static let mint        = SwiftUI.Color(red: 0.490, green: 0.749, blue: 0.604) // #7DBF9A
@@ -19,24 +19,24 @@ enum Ben {
         /// Deep mint — success text on light backgrounds
         static let mintDark    = SwiftUI.Color(red: 0.102, green: 0.420, blue: 0.251) // #1A6B40
 
-        // Backgrounds
-        /// Warm cream — primary app background (replaces plain white)
-        static let cream       = SwiftUI.Color(red: 0.996, green: 0.988, blue: 0.969) // #FEFCF7
-        /// Warm sand — secondary surfaces, cards, input backgrounds
-        static let sand        = SwiftUI.Color(red: 0.933, green: 0.914, blue: 0.875) // #EEE9DF
-        /// Muted sand border — dividers, card strokes
-        static let sandBorder  = SwiftUI.Color(red: 0.839, green: 0.816, blue: 0.769) // #D6D0C4
+        // Backgrounds — cool white/gray palette (Amex-inspired)
+        /// Primary app background — near-white
+        static let cream       = SwiftUI.Color(red: 0.969, green: 0.969, blue: 0.976) // #F7F7F9
+        /// Secondary surfaces — cards, input backgrounds (white on gray bg)
+        static let sand        = SwiftUI.Color.white
+        /// Dividers, card strokes — cool gray border
+        static let sandBorder  = SwiftUI.Color(red: 0.820, green: 0.820, blue: 0.839) // #D1D1D6
 
-        // Text
+        // Text — cool neutral grays
         /// Near-black — primary text, headings
-        static let textPrimary = SwiftUI.Color(red: 0.110, green: 0.102, blue: 0.082) // #1C1A15
-        /// Warm brown — body text, secondary content
-        static let textBody    = SwiftUI.Color(red: 0.420, green: 0.388, blue: 0.337) // #6B6356
-        /// Muted tan — captions, labels, placeholders
-        static let textMuted   = SwiftUI.Color(red: 0.541, green: 0.498, blue: 0.431) // #8A7F6E
+        static let textPrimary = SwiftUI.Color(red: 0.110, green: 0.110, blue: 0.118) // #1C1C1E
+        /// Medium gray — body text, secondary content
+        static let textBody    = SwiftUI.Color(red: 0.388, green: 0.388, blue: 0.400) // #636366
+        /// Light gray — captions, labels, placeholders
+        static let textMuted   = SwiftUI.Color(red: 0.557, green: 0.557, blue: 0.576) // #8E8E93
 
         // Semantic
-        /// Warm amber — warnings, "worth-it" anxiety states
+        /// Amber — warnings, "worth-it" anxiety states
         static let warn        = SwiftUI.Color(red: 0.722, green: 0.361, blue: 0.039) // #B85C0A
         /// Soft amber background — warning fill areas
         static let warnLight   = SwiftUI.Color(red: 0.980, green: 0.933, blue: 0.855) // #FAEEDA
@@ -104,7 +104,7 @@ struct BenBackground: ViewModifier {
     }
 }
 
-/// Standard card surface — sand bg, subtle border
+/// Standard card surface — white on gray, with subtle shadow
 struct BenCard: ViewModifier {
     var padding: CGFloat = Ben.Spacing.lg
 
@@ -113,22 +113,20 @@ struct BenCard: ViewModifier {
             .padding(padding)
             .background(Ben.Color.sand)
             .cornerRadius(Ben.Radius.lg)
+            .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 }
 
-/// Raised card — cream bg, sand border (for cards that float above the sand bg)
+/// Raised card — white bg, subtle shadow (for cards that float above the gray bg)
 struct BenRaisedCard: ViewModifier {
     var padding: CGFloat = Ben.Spacing.lg
 
     func body(content: Content) -> some View {
         content
             .padding(padding)
-            .background(Ben.Color.cream)
+            .background(Color.white)
             .cornerRadius(Ben.Radius.lg)
-            .overlay(
-                RoundedRectangle(cornerRadius: Ben.Radius.lg)
-                    .stroke(Ben.Color.sandBorder, lineWidth: 0.5)
-            )
+            .shadow(color: .black.opacity(0.06), radius: 6, y: 3)
     }
 }
 
@@ -199,7 +197,7 @@ struct BenPrimaryButton: View {
         Button(action: action) {
             Text(title)
                 .font(Ben.Font.buttonPrimary)
-                .foregroundColor(Ben.Color.mintLight)
+                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Ben.Spacing.lg)
                 .background(Ben.Color.forest)
@@ -351,7 +349,7 @@ struct BenStepRow: View {
                     .frame(width: 30, height: 30)
                 Text("\(number)")
                     .font(Ben.Font.sans(13, weight: .medium))
-                    .foregroundColor(Ben.Color.mintLight)
+                    .foregroundColor(.white)
             }
             .padding(.top, 1)
 

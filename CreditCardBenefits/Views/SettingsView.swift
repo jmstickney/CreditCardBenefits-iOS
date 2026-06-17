@@ -94,6 +94,9 @@ struct SettingsView: View {
                             }
                         }
 
+                        #if DEBUG
+                        // Anonymous sign-in is a debug-only testing affordance and
+                        // must not ship in release builds.
                         Button("Sign In Anonymously (Test)") {
                             Task {
                                 do {
@@ -107,6 +110,7 @@ struct SettingsView: View {
                             }
                         }
                         .foregroundColor(.secondary)
+                        #endif
                     }
                 }
 

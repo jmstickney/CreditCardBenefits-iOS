@@ -310,34 +310,29 @@ struct AnniversaryDatePickerView: View {
     let card: CreditCard
     let plaidAccount: PlaidAccount
     let onSave: (Date) -> Void
-    
+
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedDate = Date()
-    
+    @State private var selectedMonth: Int = Calendar.current.component(.month, from: Date())
+    @State private var selectedDay: Int = Calendar.current.component(.day, from: Date())
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Card Anniversary Date")
+                        Text("Card Anniversary")
                             .font(.headline)
-                        Text("This helps track annual benefits that reset on your account anniversary.")
+                        Text("Annual benefits reset on this month and day each year.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
                 }
-                
-                Section(header: Text("Select Anniversary Date")) {
-                    DatePicker(
-                        "Anniversary Date",
-                        selection: $selectedDate,
-                        in: ...Date(),
-                        displayedComponents: [.date]
-                    )
-                    .datePickerStyle(.graphical)
-                    
-                    Text("This is usually the date you opened your account or the date your card was approved.")
+
+                Section(header: Text("Select Anniversary")) {
+                    MonthDayPicker(month: $selectedMonth, day: $selectedDay)
+
+                    Text("Pick the month and day your account was opened.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -352,11 +347,77 @@ struct AnniversaryDatePickerView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        onSave(selectedDate)
+                        onSave(AnniversaryDateHelper.makeDate(month: selectedMonth, day: selectedDay))
                     }
                 }
             }
         }
+    }
+}
+
+// MARK: - Month/Day Picker
+
+struct MonthDayPicker: View {
+    @Binding var month: Int
+    @Binding var day: Int
+
+    private let monthNames = Calendar.current.monthSymbols
+
+    private var daysInMonth: Int {
+        var components = DateComponents()
+        components.year = 2024  // leap year so Feb 29 is selectable
+        components.month = month
+        if let date = Calendar.current.date(from: components),
+           let range = Calendar.current.range(of: .day, in: .month, for: date) {
+            return range.count
+        }
+        return 31
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Picker("Month", selection: $month) {
+                ForEach(1...12, id: \.self) { m in
+                    Text(monthNames[m - 1]).tag(m)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(maxWidth: .infinity)
+
+            Picker("Day", selection: $day) {
+                ForEach(1...daysInMonth, id: \.self) { d in
+                    Text("\(d)").tag(d)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(maxWidth: .infinity)
+        }
+        .onChange(of: month) { _, _ in
+            if day > daysInMonth {
+                day = daysInMonth
+            }
+        }
+    }
+}
+
+// MARK: - Anniversary Date Helper
+
+enum AnniversaryDateHelper {
+    /// Builds a Date from a month/day, using a leap year so Feb 29 is representable.
+    /// Only the month and day are meaningful; downstream logic ignores the year.
+    static func makeDate(month: Int, day: Int) -> Date {
+        var components = DateComponents()
+        components.year = 2024
+        components.month = month
+        components.day = day
+        return Calendar.current.date(from: components) ?? Date()
+    }
+
+    /// Formats a stored anniversary Date as "Month Day" (year stripped).
+    static func displayString(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d"
+        return formatter.string(from: date)
     }
 }
 

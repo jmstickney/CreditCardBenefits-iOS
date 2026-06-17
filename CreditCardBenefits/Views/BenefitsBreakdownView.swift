@@ -33,6 +33,19 @@ struct BenefitsBreakdownView: View {
     }
 }
 
+// MARK: - Utilization Lookup Helper
+
+/// Picks the utilization for the given benefit ID, preferring the period that contains today.
+/// Falls back to the most recent period if no current-period utilization exists.
+func pickCurrentUtilization(for benefitId: String, in utilizations: [BenefitUtilization]) -> BenefitUtilization? {
+    let matching = utilizations.filter { $0.benefitId == benefitId }
+    let now = Date()
+    if let current = matching.first(where: { $0.periodStart <= now && now <= $0.periodEnd }) {
+        return current
+    }
+    return matching.sorted(by: { $0.periodStart > $1.periodStart }).first
+}
+
 // MARK: - Simple Card Benefits Section
 struct SimpleCardBenefitsSection: View {
     let card: CreditCard
@@ -113,7 +126,7 @@ struct SimpleCardBenefitsSection: View {
                         ForEach(card.benefits) { benefit in
                             SimpleBenefitRow(
                                 benefit: benefit,
-                                utilization: utilizations.first { $0.benefitId == benefit.id }
+                                utilization: pickCurrentUtilization(for: benefit.id, in: utilizations)
                             )
                         }
                     }

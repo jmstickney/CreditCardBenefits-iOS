@@ -24,7 +24,7 @@ struct CreditCardBenefitsApp: App {
     init() {
         // Initialize Firebase when app launches
         FirebaseApp.configure()
-        print("✅ Firebase initialized successfully")
+        benLog("✅ Firebase initialized successfully")
     }
 
     var body: some Scene {

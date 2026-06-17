@@ -11,6 +11,7 @@ struct Transaction: Identifiable, Codable, Equatable {
     let id: String
     let date: Date
     let merchant: String
+    var merchantName: String? = nil  // Plaid's cleaned merchant_name field (often different from name)
     let amount: Double
     let category: String?
     let accountId: String

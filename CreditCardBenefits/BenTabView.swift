@@ -8,6 +8,7 @@ import SwiftUI
 struct BenTabView: View {
 
     @State private var selectedTab: BenTab = .home
+    @State private var showingNotifications = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -17,6 +18,9 @@ struct BenTabView: View {
                     .toolbar { homeToolbar }
                     .toolbarBackground(Ben.Color.cream, for: .navigationBar)
                     .toolbarBackground(.visible, for: .navigationBar)
+                    .sheet(isPresented: $showingNotifications) {
+                        NotificationsView()
+                    }
             }
             .tabItem {
                 Label("Home", systemImage: selectedTab == .home
@@ -67,9 +71,13 @@ struct BenTabView: View {
     private var homeToolbar: some ToolbarContent {
         // Leading: card-stack icon (matches Amex app placement)
         ToolbarItem(placement: .navigationBarLeading) {
-            Image(systemName: "rectangle.stack")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(Ben.Color.forest)
+            Button {
+                selectedTab = .cards
+            } label: {
+                Image(systemName: "rectangle.stack")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(Ben.Color.forest)
+            }
         }
         // Center: ben. wordmark
         ToolbarItem(placement: .principal) {
@@ -80,7 +88,7 @@ struct BenTabView: View {
         // Trailing: notifications bell
         ToolbarItem(placement: .navigationBarTrailing) {
             Button {
-                // TODO: open notifications
+                showingNotifications = true
             } label: {
                 Image(systemName: "bell")
                     .font(.system(size: 17, weight: .medium))

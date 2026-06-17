@@ -182,6 +182,27 @@ struct ManualBenefitClaim: Identifiable, Codable {
 
 struct BenefitPeriodHelper {
 
+    /// Sum of `amountUtilized` counting toward the current calendar year.
+    /// - Monthly utilizations: include every month-period within the current year up to today.
+    /// - Annual / cardmember-year / one-time utilizations: include the period that contains today.
+    static func yearToDateUtilized(_ utilizations: [BenefitUtilization]) -> Double {
+        let now = Date()
+        let cal = Calendar.current
+        let yearStart = cal.date(from: DateComponents(
+            year: cal.component(.year, from: now), month: 1, day: 1
+        )) ?? now
+        return utilizations.reduce(0.0) { sum, util in
+            switch util.periodType {
+            case .monthly:
+                guard util.periodStart >= yearStart && util.periodStart <= now else { return sum }
+                return sum + util.amountUtilized
+            case .calendarYear, .cardmemberYear, .oneTime:
+                guard util.periodStart <= now && now <= util.periodEnd else { return sum }
+                return sum + util.amountUtilized
+            }
+        }
+    }
+
     /// Get current period boundaries for a benefit
     static func currentPeriod(
         for period: BenefitPeriod,
@@ -229,6 +250,61 @@ struct BenefitPeriodHelper {
             let end = calendar.date(from: DateComponents(year: year + 4, month: 12, day: 31, hour: 23, minute: 59, second: 59))!
             return (start, end)
         }
+    }
+
+    /// Get all periods from the earliest transaction date to now
+    static func allPeriods(
+        for period: BenefitPeriod,
+        from earliestDate: Date,
+        cardAnniversaryDate: Date? = nil
+    ) -> [(start: Date, end: Date)] {
+        let calendar = Calendar.current
+        let now = Date()
+        var periods: [(start: Date, end: Date)] = []
+
+        switch period {
+        case .monthly:
+            var start = calendar.date(from: calendar.dateComponents([.year, .month], from: earliestDate))!
+            while start <= now {
+                let end = calendar.date(byAdding: .month, value: 1, to: start)!.addingTimeInterval(-1)
+                periods.append((start, end))
+                start = calendar.date(byAdding: .month, value: 1, to: start)!
+            }
+
+        case .calendarYear:
+            var year = calendar.component(.year, from: earliestDate)
+            let currentYear = calendar.component(.year, from: now)
+            while year <= currentYear {
+                let start = calendar.date(from: DateComponents(year: year, month: 1, day: 1))!
+                let end = calendar.date(from: DateComponents(year: year, month: 12, day: 31, hour: 23, minute: 59, second: 59))!
+                periods.append((start, end))
+                year += 1
+            }
+
+        case .cardmemberYear:
+            guard let anniversary = cardAnniversaryDate else {
+                // Fall back to calendar year iteration if no anniversary date
+                return allPeriods(for: .calendarYear, from: earliestDate, cardAnniversaryDate: nil)
+            }
+            let anniversaryMonth = calendar.component(.month, from: anniversary)
+            let anniversaryDay = calendar.component(.day, from: anniversary)
+            var year = calendar.component(.year, from: earliestDate)
+            let currentYear = calendar.component(.year, from: now)
+            while year <= currentYear + 1 {
+                if let start = calendar.date(from: DateComponents(year: year, month: anniversaryMonth, day: anniversaryDay)),
+                   let end = calendar.date(byAdding: .year, value: 1, to: start)?.addingTimeInterval(-1),
+                   start <= now {
+                    periods.append((start, end))
+                }
+                year += 1
+            }
+
+        case .oneTime:
+            // One-time benefits span a long duration; use the current period
+            periods.append(currentPeriod(for: period, cardAnniversaryDate: cardAnniversaryDate))
+        }
+
+        return periods
     }
 
     /// Calculate benefit value for a specific period

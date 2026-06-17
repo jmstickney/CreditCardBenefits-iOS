@@ -1,0 +1,42 @@
+# macOS
+.DS_Store
+
+# Xcode — user-specific settings & state
+xcuserdata/
+*.xcuserstate
+
+# Xcode — build artifacts
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# CocoaPods / Carthage (if ever added)
+Pods/
+Carthage/Build/
+
+# Secrets — never commit credentials, keys, or provisioning material
+*.env
+.env*
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+*.pem
+*.key
+Secrets.plist
+Secrets.xcconfig
+
+# NOTE: A Firebase iOS API key is not a secret — it ships in every App Store
+# binary by design — and GoogleService-Info.plist is required to build, so it is
+# intentionally NOT ignored. Protect the project by restricting the API key in
+# the Google Cloud console and enabling Firebase App Check. To keep the file out
+# of version control instead, uncomment the next line and inject it at build time.
+# GoogleService-Info.plist

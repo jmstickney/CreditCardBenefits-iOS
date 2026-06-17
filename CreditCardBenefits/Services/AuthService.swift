@@ -19,7 +19,7 @@ class AuthService: ObservableObject {
         Auth.auth().addStateDidChangeListener { [weak self] _, user in
             self?.user = user
             self?.isAuthenticated = user != nil
-            print("Auth state changed. Authenticated: \(user != nil)")
+            benLog("Auth state changed. Authenticated: \(user != nil)")
         }
     }
 
@@ -30,7 +30,7 @@ class AuthService: ObservableObject {
             await MainActor.run {
                 self.user = result.user
                 self.isAuthenticated = true
-                print("✅ User signed up: \(result.user.uid)")
+                benLog("✅ User signed up: \(result.user.uid)")
             }
         } catch {
             await MainActor.run {
@@ -47,7 +47,7 @@ class AuthService: ObservableObject {
             await MainActor.run {
                 self.user = result.user
                 self.isAuthenticated = true
-                print("✅ User signed in: \(result.user.uid)")
+                benLog("✅ User signed in: \(result.user.uid)")
             }
         } catch {
             await MainActor.run {
@@ -63,7 +63,7 @@ class AuthService: ObservableObject {
             try Auth.auth().signOut()
             self.user = nil
             self.isAuthenticated = false
-            print("✅ User signed out")
+            benLog("✅ User signed out")
         } catch {
             self.error = error.localizedDescription
             throw error
@@ -77,7 +77,7 @@ class AuthService: ObservableObject {
             await MainActor.run {
                 self.user = result.user
                 self.isAuthenticated = true
-                print("✅ User signed in anonymously: \(result.user.uid)")
+                benLog("✅ User signed in anonymously: \(result.user.uid)")
             }
         } catch {
             await MainActor.run {

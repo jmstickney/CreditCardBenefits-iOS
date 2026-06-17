@@ -39,14 +39,18 @@ struct CardsListView: View {
                                 )
                             }
                             .buttonStyle(PlainButtonStyle())
-                            
+
                             // Separator between cards (except last one)
                             if card.id != dataManager.userCards.last?.id {
                                 Divider()
-                                    .background(Ben.Color.sandBorder)
+                                    .padding(.leading, 88)
                             }
                         }
                     }
+                    .background(Ben.Color.sand)
+                    .cornerRadius(Ben.Radius.lg)
+                    .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+                    .padding(.horizontal, Ben.Spacing.screenH)
                 }
 
                 Spacer(minLength: 100)
@@ -118,8 +122,8 @@ private struct CardListRow: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(Ben.Color.textMuted.opacity(0.5))
         }
+        .contentShape(Rectangle())
         .padding(Ben.Spacing.lg)
-        .background(Ben.Color.sand)
     }
 }
 

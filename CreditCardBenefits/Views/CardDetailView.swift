@@ -20,8 +20,10 @@ struct CardDetailView: View {
         dataManager.utilizationService.utilizationsForCard(card.id)
     }
     
-    private var totalUtilized: Double {
-        utilizations.reduce(0) { $0 + $1.amountUtilized }
+    /// Year-to-date benefits actually used on this card (sums `amountUtilized`,
+    /// with monthly periods rolled up across the current calendar year).
+    private var totalUtilizedAnnual: Double {
+        BenefitPeriodHelper.yearToDateUtilized(utilizations)
     }
     
     private var cardMatch: CardMatch? {
@@ -55,11 +57,11 @@ struct CardDetailView: View {
                             
                             Text(card.name)
                                 .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(Ben.Color.cream)
-                            
+                                .foregroundColor(.white)
+
                             Text("•••• \(String(card.id.suffix(4)))")
                                 .font(.system(size: 14))
-                                .foregroundColor(Ben.Color.cream.opacity(0.9))
+                                .foregroundColor(.white.opacity(0.9))
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(24)
@@ -68,62 +70,12 @@ struct CardDetailView: View {
                     .padding(.top, 80)
                     .padding(.bottom, 32)
 
-                    // Annual Fee Section
-                    VStack(spacing: 16) {
-                        HStack {
-                            Text("Annual Fee")
-                                .font(Ben.Font.bodySmall)
-                                .foregroundColor(Ben.Color.textMuted)
-                            
-                            Spacer()
-                        }
-                        
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(card.annualFee.asCurrency())
-                                .font(Ben.Font.heroNumber)
-                                .foregroundColor(Ben.Color.textPrimary)
-                            
-                            Spacer()
-                        }
-                        
-                        // Benefit usage summary
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Benefits Utilized")
-                                    .font(Ben.Font.bodySmall)
-                                    .foregroundColor(Ben.Color.textMuted)
-                                Spacer()
-                                Text(totalUtilized.asCurrency())
-                                    .font(Ben.Font.body)
-                                    .foregroundColor(Ben.Color.mintDark)
-                            }
-                            
-                            HStack {
-                                Text("Total Benefits Available")
-                                    .font(Ben.Font.bodySmall)
-                                    .foregroundColor(Ben.Color.textMuted)
-                                Spacer()
-                                Text(card.totalBenefitsValue.asCurrency())
-                                    .font(Ben.Font.body)
-                                    .foregroundColor(Ben.Color.textBody)
-                            }
-                            
-                            Divider()
-                                .background(Ben.Color.sandBorder)
-                                .padding(.vertical, 8)
-                            
-                            HStack {
-                                Text("Net Value")
-                                    .font(Ben.Font.body)
-                                    .foregroundColor(Ben.Color.textMuted)
-                                Spacer()
-                                Text((totalUtilized - card.annualFee).asCurrency())
-                                    .font(.system(size: 17, weight: .bold))
-                                    .foregroundColor((totalUtilized - card.annualFee) >= 0 ? Ben.Color.mintDark : Ben.Color.warn)
-                            }
-                        }
-                        .benCard()
-                    }
+                    // Benefits Captured hero (matches homepage layout, scoped to this card)
+                    BenefitProgressHeroCard(
+                        label: "Benefits Captured",
+                        usedValue: totalUtilizedAnnual,
+                        totalFees: card.annualFee
+                    )
                     .padding(.horizontal, 20)
                     .padding(.bottom, 24)
                     
@@ -148,7 +100,7 @@ struct CardDetailView: View {
                             
                             HStack {
                                 if let anniversaryDate = cardMatch?.anniversaryDate {
-                                    Text(anniversaryDate.formatted(date: .abbreviated, time: .omitted))
+                                    Text(AnniversaryDateHelper.displayString(for: anniversaryDate))
                                         .font(.system(size: 17, weight: .semibold))
                                         .foregroundColor(Ben.Color.textPrimary)
                                 } else {
@@ -180,7 +132,7 @@ struct CardDetailView: View {
                         ForEach(card.benefits) { benefit in
                             AmexBenefitRow(
                                 benefit: benefit,
-                                utilization: utilizations.first { $0.benefitId == benefit.id }
+                                utilization: dataManager.utilizationService.utilizationForBenefit(benefit.id, cardId: card.id)
                             )
                             .environmentObject(dataManager)
                         }
@@ -224,7 +176,7 @@ struct CardDetailView: View {
                 )
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
     }
 }
 
@@ -289,7 +241,7 @@ struct AmexBenefitRow: View {
                         if isUsed {
                             if canAutoDetect && amountUsed > 0 {
                                 HStack(spacing: 4) {
-                                    Text("Used \(amountUsed.asCurrency()) • \((utilizationPercentage * 100).rounded())% utilized")
+                                    Text("Used \(amountUsed.asCurrency()) • \(Int((utilizationPercentage * 100).rounded()))% utilized")
                                         .font(Ben.Font.bodySmall)
                                         .foregroundColor(Ben.Color.mintDark)
                                     
@@ -632,10 +584,10 @@ struct ManualBenefitToggleView: View {
                     .fontWeight(.semibold)
                 }
             }
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(.light)
         }
     }
-    
+
     private func saveBenefitStatus() async {
         if isUsing {
             // Mark as used with full value
@@ -716,42 +668,40 @@ struct EditAnniversaryDateView: View {
     let plaidAccount: PlaidAccount
     let currentDate: Date?
     let onSave: (Date) -> Void
-    
+
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedDate: Date
-    
+    @State private var selectedMonth: Int
+    @State private var selectedDay: Int
+
     init(card: CreditCard, plaidAccount: PlaidAccount, currentDate: Date?, onSave: @escaping (Date) -> Void) {
         self.card = card
         self.plaidAccount = plaidAccount
         self.currentDate = currentDate
         self.onSave = onSave
-        _selectedDate = State(initialValue: currentDate ?? Date())
+        let calendar = Calendar.current
+        let initial = currentDate ?? Date()
+        _selectedMonth = State(initialValue: calendar.component(.month, from: initial))
+        _selectedDay = State(initialValue: calendar.component(.day, from: initial))
     }
-    
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Card Anniversary Date")
+                        Text("Card Anniversary")
                             .font(.headline)
-                        Text("This date is used to track annual benefits that reset on your account anniversary.")
+                        Text("Annual benefits reset on this month and day each year.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
                 }
-                
-                Section(header: Text("Select Anniversary Date")) {
-                    DatePicker(
-                        "Anniversary Date",
-                        selection: $selectedDate,
-                        in: ...Date(),
-                        displayedComponents: [.date]
-                    )
-                    .datePickerStyle(.graphical)
-                    
-                    Text("This is usually the date you opened your account. For example, if you opened your account on September 22, 2023, set it to September 22.")
+
+                Section(header: Text("Select Anniversary")) {
+                    MonthDayPicker(month: $selectedMonth, day: $selectedDay)
+
+                    Text("Pick the month and day your account was opened. For example, if you opened your account on September 22, set it to September 22.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -766,7 +716,7 @@ struct EditAnniversaryDateView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        onSave(selectedDate)
+                        onSave(AnniversaryDateHelper.makeDate(month: selectedMonth, day: selectedDay))
                         dismiss()
                     }
                 }

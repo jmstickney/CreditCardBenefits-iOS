@@ -21,6 +21,7 @@ struct CardMapping: Codable, Identifiable {
     let isAutoDetected: Bool
     let createdAt: Date
     let updatedAt: Date
+    var anniversaryDate: Date?
 }
 
 // MARK: - Card Mapping Service
@@ -59,13 +60,13 @@ class CardMappingService: ObservableObject {
                 self.isLoading = false
             }
 
-            print("✅ Loaded \(loadedMappings.count) card mappings")
+            benLog("✅ Loaded \(loadedMappings.count) card mappings")
 
         } catch {
             await MainActor.run {
                 self.isLoading = false
             }
-            print("❌ Error loading card mappings: \(error.localizedDescription)")
+            benLog("❌ Error loading card mappings: \(error.localizedDescription)")
         }
     }
 
@@ -84,7 +85,7 @@ class CardMappingService: ObservableObject {
             self.mappings[mapping.plaidAccountId] = mapping
         }
 
-        print("✅ Saved mapping for account \(mapping.plaidAccountId)")
+        benLog("✅ Saved mapping for account \(mapping.plaidAccountId)")
     }
 
     /// Creates and saves a mapping from a CardMatch
@@ -97,7 +98,8 @@ class CardMappingService: ObservableObject {
             plaidAccountMask: match.plaidAccount.mask,
             isAutoDetected: isAutoDetected,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
+            anniversaryDate: match.anniversaryDate
         )
 
         try await saveMapping(mapping, userId: userId)
@@ -143,7 +145,7 @@ class CardMappingService: ObservableObject {
             self.mappings.removeValue(forKey: accountId)
         }
 
-        print("✅ Deleted mapping for account \(accountId)")
+        benLog("✅ Deleted mapping for account \(accountId)")
     }
 
     /// Clears all mappings (used when disconnecting)

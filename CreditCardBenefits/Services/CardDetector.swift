@@ -42,14 +42,14 @@ class CardDetector {
         let uniqueCreditCards = creditCards.filter { account in
             // Skip if we've seen this exact account ID
             if seenIds.contains(account.id) {
-                print("⚠️ Skipping duplicate account ID: \(account.name)")
+                benLog("⚠️ Skipping duplicate account ID: \(account.name)")
                 return false
             }
 
             // Skip if we've seen this mask (same physical card)
             if let mask = account.mask, !mask.isEmpty {
                 if seenMasks.contains(mask) {
-                    print("⚠️ Skipping duplicate card (same last 4): \(account.name) (**** \(mask))")
+                    benLog("⚠️ Skipping duplicate card (same last 4): \(account.name) (**** \(mask))")
                     return false
                 }
                 seenMasks.insert(mask)
@@ -59,9 +59,9 @@ class CardDetector {
             return true
         }
 
-        print("💳 Found \(uniqueCreditCards.count) unique credit card accounts out of \(accounts.count) total")
+        benLog("💳 Found \(uniqueCreditCards.count) unique credit card accounts out of \(accounts.count) total")
         if creditCards.count != uniqueCreditCards.count {
-            print("   (removed \(creditCards.count - uniqueCreditCards.count) duplicates)")
+            benLog("   (removed \(creditCards.count - uniqueCreditCards.count) duplicates)")
         }
 
         return uniqueCreditCards
@@ -73,7 +73,7 @@ class CardDetector {
         let creditCardAccounts = creditCardAccounts(from: accounts)
 
         return creditCardAccounts.map { account in
-            print("📋 Created match entry for: \(account.name) (**** \(account.mask ?? ""))")
+            benLog("📋 Created match entry for: \(account.name) (**** \(account.mask ?? ""))")
             return CardMatch(plaidAccount: account)
         }
     }

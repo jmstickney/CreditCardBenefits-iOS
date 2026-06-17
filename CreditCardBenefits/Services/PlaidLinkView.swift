@@ -37,7 +37,7 @@ class PlaidLinkViewController: UIViewController {
         self.onSuccess = onSuccess
         self.onExit = onExit
         super.init(nibName: nil, bundle: nil)
-        print("🔗 PlaidLinkViewController init with token: \(linkToken.prefix(30))...")
+        benLog("🔗 PlaidLinkViewController init")
     }
 
     required init?(coder: NSCoder) {
@@ -46,47 +46,47 @@ class PlaidLinkViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        print("🔗 PlaidLinkViewController viewDidLoad")
+        benLog("🔗 PlaidLinkViewController viewDidLoad")
         view.backgroundColor = .systemBackground
     }
 
     override func viewDidAppear(_ animated: Bool) {
-        print("🔗 PlaidLinkViewController viewDidAppear")
+        benLog("🔗 PlaidLinkViewController viewDidAppear")
         super.viewDidAppear(animated)
 
         // Only present once
         guard linkHandler == nil else { return }
 
-        print("🔗 Creating Plaid Link with token: \(linkToken.prefix(30))...")
+        benLog("🔗 Creating Plaid Link")
 
         // Create Link configuration
         var linkConfiguration = LinkTokenConfiguration(
             token: linkToken
         ) { [weak self] success in
-            print("✅ Plaid Link success: \(success.publicToken)")
+            benLog("✅ Plaid Link success (public token received)")
             self?.onSuccess(success.publicToken)
         }
 
         linkConfiguration.onExit = { [weak self] exit in
             if let error = exit.error {
-                print("❌ Plaid Link exit with error: \(error)")
+                benLog("❌ Plaid Link exit with error: \(error)")
             } else {
-                print("ℹ️ User exited Plaid Link: \(String(describing: exit.metadata.status))")
+                benLog("ℹ️ User exited Plaid Link: \(String(describing: exit.metadata.status))")
             }
             self?.onExit()
         }
 
         // Create and open Plaid Link
-        print("🔗 Calling Plaid.create()...")
+        benLog("🔗 Calling Plaid.create()...")
         let result = Plaid.create(linkConfiguration)
         switch result {
         case .success(let handler):
-            print("🔗 Plaid handler created, opening...")
+            benLog("🔗 Plaid handler created, opening...")
             self.linkHandler = handler
             handler.open(presentUsing: .viewController(self))
         case .failure(let error):
-            print("❌ Plaid Link creation failed: \(error)")
-            print("❌ Error details: \(error.localizedDescription)")
+            benLog("❌ Plaid Link creation failed: \(error)")
+            benLog("❌ Error details: \(error.localizedDescription)")
             onExit()
         }
     }

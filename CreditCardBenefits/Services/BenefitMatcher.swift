@@ -67,7 +67,7 @@ class BenefitMatcher {
                             matches.append(match)
                         } catch {
                             // Log but continue processing other matches
-                            print("⚠️ Failed to calculate savings for \(subscription.merchant): \(error)")
+                            benLog("⚠️ Failed to calculate savings for \(subscription.merchant): \(error)")
                             continue
                         }
                     }

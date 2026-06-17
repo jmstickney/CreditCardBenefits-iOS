@@ -49,9 +49,12 @@ final class CacheManager {
         let url = cacheDirectory.appendingPathComponent("\(key.rawValue).json")
         do {
             let data = try encoder.encode(value)
-            try data.write(to: url, options: .atomic)
+            // Encrypt the cache at rest. `untilFirstUserAuthentication` keeps the
+            // file readable for background refresh after the first post-boot unlock
+            // while still protecting financial data when the device is at rest.
+            try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         } catch {
-            print("Cache write error for \(key.rawValue): \(error)")
+            benLog("Cache write error for \(key.rawValue): \(error)")
         }
     }
 
@@ -70,6 +73,12 @@ final class CacheManager {
     var needsRefresh: Bool {
         guard let lastRefresh = lastRefreshDate else { return true }
         return Date().timeIntervalSince(lastRefresh) > 6 * 60 * 60
+    }
+
+    /// Returns true if data is stale enough to warrant a refresh when the app returns to foreground
+    var needsForegroundRefresh: Bool {
+        guard let lastRefresh = lastRefreshDate else { return true }
+        return Date().timeIntervalSince(lastRefresh) > 1 * 60 * 60  // 1 hour
     }
 
     func clearAll() {

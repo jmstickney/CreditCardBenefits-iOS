@@ -11,23 +11,14 @@ struct HomeHeaderView: View {
     let cardCount: Int           // e.g. 3
     let unusedBenefitCount: Int  // e.g. 23
 
-    private var progress: Double {
-        guard totalFees > 0 else { return 0 }
-        return min(usedValue / totalFees, 1.0)
-    }
-
-    private var remaining: Double {
-        max(totalFees - usedValue, 0)
-    }
-
-    private var percentCaptured: Int {
-        Int((progress * 100).rounded())
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: Ben.Spacing.md) {
             dateLabel
-            heroCard
+            BenefitProgressHeroCard(
+                label: "Benefits Captured",
+                usedValue: usedValue,
+                totalFees: totalFees
+            )
             quickStats
         }
         .padding(.horizontal, Ben.Spacing.screenH)
@@ -42,61 +33,6 @@ struct HomeHeaderView: View {
             .tracking(0.8)
             .textCase(.uppercase)
             .foregroundColor(Ben.Color.textMuted)
-    }
-
-    // MARK: - Forest green hero card
-    private var heroCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-
-            // Label
-            Text("annual fee value")
-                .font(Ben.Font.tag)
-                .tracking(1.0)
-                .textCase(.uppercase)
-                .foregroundColor(Ben.Color.mint)
-                .padding(.bottom, Ben.Spacing.xs)
-
-            // Big number
-            Text(usedValue, format: .currency(code: "USD").precision(.fractionLength(0)))
-                .font(Ben.Font.heroNumber)
-                .foregroundColor(Ben.Color.mintLight)
-                .lineLimit(1)
-
-            // Subtitle
-            Text("of \(totalFees, format: .currency(code: "USD").precision(.fractionLength(0))) used so far")
-                .font(Ben.Font.micro)
-                .foregroundColor(Ben.Color.mint)
-                .padding(.bottom, Ben.Spacing.lg)
-
-            // Progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.15))
-                        .frame(height: 6)
-                    Capsule()
-                        .fill(Ben.Color.mint)
-                        .frame(width: max(geo.size.width * progress, 6), height: 6)
-                        .animation(.spring(response: 0.8, dampingFraction: 0.75).delay(0.2), value: progress)
-                }
-            }
-            .frame(height: 6)
-            .padding(.bottom, Ben.Spacing.sm)
-
-            // Bar meta row
-            HStack {
-                Text("\(percentCaptured)% captured")
-                    .font(Ben.Font.micro)
-                    .foregroundColor(Ben.Color.mint)
-                Spacer()
-                Text("\(remaining, format: .currency(code: "USD").precision(.fractionLength(0))) remaining")
-                    .font(Ben.Font.micro)
-                    .foregroundColor(Ben.Color.mint)
-            }
-        }
-        .padding(Ben.Spacing.xl)
-        .background(Ben.Color.forest)
-        .cornerRadius(Ben.Radius.xl)
     }
 
     // MARK: - Quick stat chips below the hero card
@@ -116,8 +52,92 @@ struct HomeHeaderView: View {
     }
 }
 
+// MARK: - Benefit Progress Hero Card
+
+/// Reusable hero card showing "$ benefits captured vs $ in fees" with a gradient progress bar.
+/// Used on the homepage (aggregate across all cards) and on card detail (single card).
+struct BenefitProgressHeroCard: View {
+    let label: String
+    let usedValue: Double
+    let totalFees: Double
+
+    private var progress: Double {
+        guard totalFees > 0 else { return 0 }
+        return min(usedValue / totalFees, 1.0)
+    }
+
+    private var remaining: Double {
+        max(totalFees - usedValue, 0)
+    }
+
+    private var percentCaptured: Int {
+        Int((progress * 100).rounded())
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+
+            // Label
+            Text(label)
+                .font(Ben.Font.tag)
+                .tracking(1.0)
+                .textCase(.uppercase)
+                .foregroundColor(Ben.Color.textMuted)
+                .padding(.bottom, Ben.Spacing.xs)
+
+            // Big number
+            Text(usedValue, format: .currency(code: "USD").precision(.fractionLength(0)))
+                .font(Ben.Font.heroNumber)
+                .foregroundColor(Ben.Color.textPrimary)
+                .lineLimit(1)
+
+            // Subtitle
+            Text("of \(totalFees, format: .currency(code: "USD").precision(.fractionLength(0))) in annual fees")
+                .font(Ben.Font.micro)
+                .foregroundColor(Ben.Color.textMuted)
+                .padding(.bottom, Ben.Spacing.lg)
+
+            // Progress bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Ben.Color.sandBorder.opacity(0.5))
+                        .frame(height: 12)
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [.red, .orange, .yellow, .green],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(geo.size.width * progress, 12), height: 12)
+                        .animation(.spring(response: 0.8, dampingFraction: 0.75).delay(0.2), value: progress)
+                }
+            }
+            .frame(height: 12)
+            .padding(.bottom, Ben.Spacing.sm)
+
+            // Bar meta row
+            HStack {
+                Text("\(percentCaptured)% captured")
+                    .font(Ben.Font.micro)
+                    .foregroundColor(Ben.Color.textMuted)
+                Spacer()
+                Text("\(remaining, format: .currency(code: "USD").precision(.fractionLength(0))) remaining")
+                    .font(Ben.Font.micro)
+                    .foregroundColor(Ben.Color.textMuted)
+            }
+        }
+        .padding(Ben.Spacing.xl)
+        .background(Color.white)
+        .cornerRadius(Ben.Radius.xl)
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+    }
+}
+
 // MARK: - Quick Stat Chip
-private struct QuickStatChip: View {
+struct QuickStatChip: View {
     let label: String
     let value: String
     let valueColor: Color
@@ -137,6 +157,7 @@ private struct QuickStatChip: View {
         .padding(.vertical, Ben.Spacing.md)
         .background(Ben.Color.sand)
         .cornerRadius(Ben.Radius.lg)
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 }
 

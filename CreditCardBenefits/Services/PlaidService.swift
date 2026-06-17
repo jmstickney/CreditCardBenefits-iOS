@@ -55,10 +55,10 @@ class PlaidService: ObservableObject {
             }
 
             if !parsedAccounts.isEmpty {
-                print("✅ Restored connection: Found \(parsedAccounts.count) accounts")
+                benLog("✅ Restored connection: Found \(parsedAccounts.count) accounts")
                 return true
             } else {
-                print("ℹ️ No existing Plaid accounts found")
+                benLog("ℹ️ No existing Plaid accounts found")
                 return false
             }
 
@@ -68,7 +68,7 @@ class PlaidService: ObservableObject {
                 self.dataSource = .none
                 self.isLoading = false
             }
-            print("ℹ️ No existing Plaid connection: \(error.localizedDescription)")
+            benLog("ℹ️ No existing Plaid connection: \(error.localizedDescription)")
             return false
         }
     }
@@ -96,7 +96,7 @@ class PlaidService: ObservableObject {
                 isLoading = false
             }
 
-            print("✅ Link token created: \(linkToken.prefix(20))...")
+            benLog("✅ Link token created")
             return linkToken
 
         } catch {
@@ -122,47 +122,47 @@ class PlaidService: ObservableObject {
 
             // UI operations must be on main thread
             await MainActor.run {
-                print("🟢 Creating LinkTokenConfiguration...")
+                benLog("🟢 Creating LinkTokenConfiguration...")
                 var linkConfiguration = LinkTokenConfiguration(
                     token: linkToken
                 ) { [weak self] success in
-                    print("✅ Plaid Link success: \(success.publicToken)")
+                    benLog("✅ Plaid Link success (public token received)")
                     Task {
                         await self?.exchangePublicToken(success.publicToken)
                     }
                 }
 
                 linkConfiguration.onExit = { [weak self] exit in
-                    print("ℹ️ User exited Plaid Link: \(exit.metadata)")
+                    benLog("ℹ️ User exited Plaid Link: \(exit.metadata)")
                     Task { @MainActor in
                         self?.isLoading = false
                     }
                 }
 
-                print("🟢 Calling Plaid.create()...")
+                benLog("🟢 Calling Plaid.create()...")
                 let result = Plaid.create(linkConfiguration)
                 switch result {
                 case .success(let handler):
-                    print("🟢 Plaid.create() succeeded, opening handler...")
-                    print("🟢 View controller type: \(type(of: viewController))")
+                    benLog("🟢 Plaid.create() succeeded, opening handler...")
+                    benLog("🟢 View controller type: \(type(of: viewController))")
 
                     // Use .custom presentation mode for better compatibility
                     handler.open(presentUsing: .custom { linkViewController in
-                        print("🟢 Custom presentation block called")
+                        benLog("🟢 Custom presentation block called")
                         // Ensure presentation happens on main thread
                         DispatchQueue.main.async {
-                            print("🟢 Presenting on main thread...")
+                            benLog("🟢 Presenting on main thread...")
                             viewController.present(linkViewController, animated: true) {
-                                print("🟢 Modal presented successfully")
+                                benLog("🟢 Modal presented successfully")
                             }
                         }
                     })
-                    print("🟢 Handler.open() called")
+                    benLog("🟢 Handler.open() called")
                     self.isLoading = false
                 case .failure(let error):
                     self.error = error.localizedDescription
                     self.isLoading = false
-                    print("❌ Plaid.create() failed: \(error)")
+                    benLog("❌ Plaid.create() failed: \(error)")
                 }
             }
         } catch {
@@ -170,7 +170,7 @@ class PlaidService: ObservableObject {
                 self.error = error.localizedDescription
                 self.isLoading = false
             }
-            print("❌ Error creating link token: \(error.localizedDescription)")
+            benLog("❌ Error creating link token: \(error.localizedDescription)")
         }
     }
 
@@ -199,7 +199,7 @@ class PlaidService: ObservableObject {
                 self.isLoading = false
             }
 
-            print("✅ Public token exchanged successfully")
+            benLog("✅ Public token exchanged successfully")
 
             // Fetch accounts and transactions after linking
             await fetchAccounts()
@@ -210,7 +210,7 @@ class PlaidService: ObservableObject {
                 self.error = error.localizedDescription
                 self.isLoading = false
             }
-            print("❌ Error exchanging token: \(error.localizedDescription)")
+            benLog("❌ Error exchanging token: \(error.localizedDescription)")
         }
     }
 
@@ -238,7 +238,7 @@ class PlaidService: ObservableObject {
                 self.isLoading = false
             }
 
-            print("✅ Demo data populated: \(transactionCount) transactions created")
+            benLog("✅ Demo data populated: \(transactionCount) transactions created")
 
             // Automatically fetch the demo transactions we just created
             await fetchTransactions()
@@ -248,7 +248,7 @@ class PlaidService: ObservableObject {
                 self.error = error.localizedDescription
                 self.isLoading = false
             }
-            print("❌ Error populating demo data: \(error.localizedDescription)")
+            benLog("❌ Error populating demo data: \(error.localizedDescription)")
             throw error
         }
     }
@@ -263,7 +263,7 @@ class PlaidService: ObservableObject {
             self.transactions = []
             self.accounts = []
         }
-        print("✅ Bank disconnected locally")
+        benLog("✅ Bank disconnected locally")
     }
 
     // MARK: - Fetch Accounts
@@ -290,14 +290,14 @@ class PlaidService: ObservableObject {
                 self.isLoading = false
             }
 
-            print("✅ Fetched \(parsedAccounts.count) accounts")
+            benLog("✅ Fetched \(parsedAccounts.count) accounts")
 
         } catch {
             await MainActor.run {
                 self.error = error.localizedDescription
                 self.isLoading = false
             }
-            print("❌ Error fetching accounts: \(error.localizedDescription)")
+            benLog("❌ Error fetching accounts: \(error.localizedDescription)")
         }
     }
 
@@ -332,7 +332,10 @@ class PlaidService: ObservableObject {
         do {
             let calendar = Calendar.current
             let endDate = Date()
-            let startDate = calendar.date(byAdding: .year, value: -1, to: endDate) ?? endDate
+            // Pull up to 24 months so annual benefits can backfill against last
+            // cardmember year transactions. Plaid link is configured to request
+            // 730 days of history; this matches that window.
+            let startDate = calendar.date(byAdding: .day, value: -730, to: endDate) ?? endDate
 
             let dateFormatter = ISO8601DateFormatter()
             let startDateString = String(dateFormatter.string(from: startDate).split(separator: "T")[0])
@@ -356,14 +359,14 @@ class PlaidService: ObservableObject {
                 self.isLoading = false
             }
 
-            print("✅ Fetched \(parsedTransactions.count) transactions")
+            benLog("✅ Fetched \(parsedTransactions.count) transactions")
 
         } catch {
             await MainActor.run {
                 self.error = error.localizedDescription
                 self.isLoading = false
             }
-            print("❌ Error fetching transactions: \(error.localizedDescription)")
+            benLog("❌ Error fetching transactions: \(error.localizedDescription)")
         }
     }
 
@@ -381,12 +384,12 @@ class PlaidService: ObservableObject {
                   let merchant = dict["name"] as? String,
                   let amount = dict["amount"] as? Double,
                   let accountId = dict["account_id"] as? String else {
-                print("⚠️ Skipping transaction with missing required fields: \(dict)")
+                benLog("⚠️ Skipping transaction with missing required fields: \(dict)")
                 return nil
             }
 
             guard let date = dateFormatter.date(from: dateString) else {
-                print("⚠️ Skipping transaction with invalid date: \(dateString)")
+                benLog("⚠️ Skipping transaction with invalid date: \(dateString)")
                 return nil
             }
 
@@ -398,6 +401,9 @@ class PlaidService: ObservableObject {
             guard absAmount > 0 else {
                 return nil
             }
+
+            // Extract merchant_name if available (Plaid's cleaned merchant name)
+            let merchantName = dict["merchant_name"] as? String
 
             // Extract category if available (Plaid provides category as an array)
             let category: String?
@@ -411,6 +417,7 @@ class PlaidService: ObservableObject {
                 id: transactionId,
                 date: date,
                 merchant: merchant,
+                merchantName: merchantName,
                 amount: absAmount,
                 category: category,
                 accountId: accountId,

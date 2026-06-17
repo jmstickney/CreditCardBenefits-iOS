@@ -8,46 +8,103 @@
 import BackgroundTasks
 import FirebaseAuth
 import FirebaseCore
+import UIKit
 
 final class BackgroundRefreshManager {
 
     static let shared = BackgroundRefreshManager()
-    static let taskIdentifier = "com.creditcardbenefits.refresh"
+    static let refreshTaskIdentifier = "com.creditcardbenefits.refresh"
+    static let processingTaskIdentifier = "com.creditcardbenefits.processing"
 
     private init() {}
 
     // MARK: - Registration
 
-    /// Registers the background refresh task. Must be called during app launch.
+    /// Registers background tasks. Must be called during app launch.
     func registerBackgroundTask() {
         BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: Self.taskIdentifier,
+            forTaskWithIdentifier: Self.refreshTaskIdentifier,
             using: nil
         ) { task in
             guard let refreshTask = task as? BGAppRefreshTask else { return }
             self.handleAppRefresh(task: refreshTask)
         }
+
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: Self.processingTaskIdentifier,
+            using: nil
+        ) { task in
+            guard let processingTask = task as? BGProcessingTask else { return }
+            self.handleProcessingTask(task: processingTask)
+        }
+
+        // Refresh when app returns to foreground with stale data
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleForegroundReturn),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
     }
 
     // MARK: - Scheduling
 
-    /// Schedules the next background refresh (~6 hours from now).
+    /// Schedules both background refresh and processing tasks.
     func scheduleAppRefresh() {
-        let request = BGAppRefreshTaskRequest(identifier: Self.taskIdentifier)
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 6 * 60 * 60)
+        // App refresh task (~6 hours, lightweight)
+        let refreshRequest = BGAppRefreshTaskRequest(identifier: Self.refreshTaskIdentifier)
+        refreshRequest.earliestBeginDate = Date(timeIntervalSinceNow: 6 * 60 * 60)
 
         do {
-            try BGTaskScheduler.shared.submit(request)
-            print("Background refresh scheduled")
+            try BGTaskScheduler.shared.submit(refreshRequest)
+            benLog("Background refresh scheduled")
         } catch {
-            print("Failed to schedule background refresh: \(error)")
+            benLog("Failed to schedule background refresh: \(error)")
+        }
+
+        // Processing task (~12 hours, more runtime allowed by OS)
+        let processingRequest = BGProcessingTaskRequest(identifier: Self.processingTaskIdentifier)
+        processingRequest.earliestBeginDate = Date(timeIntervalSinceNow: 12 * 60 * 60)
+        processingRequest.requiresNetworkConnectivity = true
+
+        do {
+            try BGTaskScheduler.shared.submit(processingRequest)
+            benLog("Background processing task scheduled")
+        } catch {
+            benLog("Failed to schedule background processing: \(error)")
         }
     }
 
-    // MARK: - Task Handler
+    // MARK: - Foreground Return
+
+    @objc private func handleForegroundReturn() {
+        guard CacheManager.shared.needsForegroundRefresh else { return }
+        benLog("Foreground return: cache is stale, triggering refresh")
+        Task {
+            await performBackgroundRefresh()
+        }
+    }
+
+    // MARK: - Task Handlers
 
     private func handleAppRefresh(task: BGAppRefreshTask) {
-        // Schedule the next refresh immediately
+        scheduleAppRefresh()
+
+        let refreshOperation = Task {
+            await performBackgroundRefresh()
+        }
+
+        task.expirationHandler = {
+            refreshOperation.cancel()
+        }
+
+        Task {
+            await refreshOperation.value
+            task.setTaskCompleted(success: true)
+        }
+    }
+
+    private func handleProcessingTask(task: BGProcessingTask) {
         scheduleAppRefresh()
 
         let refreshOperation = Task {
@@ -69,21 +126,21 @@ final class BackgroundRefreshManager {
     @MainActor
     private func performBackgroundRefresh() async {
         guard FirebaseApp.app() != nil else {
-            print("BG Refresh: Firebase not initialized, skipping")
+            benLog("BG Refresh: Firebase not initialized, skipping")
             return
         }
 
         guard let user = Auth.auth().currentUser else {
-            print("BG Refresh: Not authenticated, skipping")
+            benLog("BG Refresh: Not authenticated, skipping")
             return
         }
 
         guard let isLinked = CacheManager.shared.load(Bool.self, for: .isLinked), isLinked else {
-            print("BG Refresh: No Plaid connection, skipping")
+            benLog("BG Refresh: No Plaid connection, skipping")
             return
         }
 
-        print("BG Refresh: Starting background data refresh")
+        benLog("BG Refresh: Starting background data refresh")
 
         let plaidService = PlaidService()
         let utilizationService = BenefitUtilizationService()
@@ -91,19 +148,22 @@ final class BackgroundRefreshManager {
 
         let hasConnection = await plaidService.checkExistingConnection()
         guard hasConnection else {
-            print("BG Refresh: Connection check failed, skipping")
+            benLog("BG Refresh: Connection check failed, skipping")
             return
         }
 
         await plaidService.fetchTransactions()
 
         guard !plaidService.transactions.isEmpty else {
-            print("BG Refresh: No transactions fetched")
+            benLog("BG Refresh: No transactions fetched")
             return
         }
 
-        // Load user cards from cache (don't re-detect, use saved cards)
-        let userCards = cache.load([CreditCard].self, for: .userCards) ?? []
+        // Load user cards from cache (don't re-detect, use saved cards).
+        // Rehydrate from CreditCardsData so new benefits added in code updates
+        // are picked up instead of frozen at whatever was cached.
+        let cachedCards = cache.load([CreditCard].self, for: .userCards) ?? []
+        let userCards = cachedCards.compactMap { CreditCardsData.getCard(by: $0.id) ?? $0 }
 
         // Reprocess subscriptions and benefit matches
         let subscriptions = (try? SubscriptionDetector.detectSubscriptions(
@@ -134,6 +194,6 @@ final class BackgroundRefreshManager {
         cache.save(utilizationService.utilizations, for: .benefitUtilizations)
         cache.save(Date(), for: .lastRefreshDate)
 
-        print("BG Refresh: Completed, cached \(plaidService.transactions.count) transactions")
+        benLog("BG Refresh: Completed, cached \(plaidService.transactions.count) transactions")
     }
 }

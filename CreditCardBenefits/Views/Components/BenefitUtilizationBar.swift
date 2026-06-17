@@ -97,7 +97,7 @@ struct BenefitUtilizationBar: View {
                             Spacer()
                             Text("\(Int(utilizationPercentage))%")
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(Ben.Color.cream)
+                                .foregroundColor(.white)
                             Spacer()
                         }
                     }

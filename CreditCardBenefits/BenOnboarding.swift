@@ -68,7 +68,7 @@ struct WelcomeScreen: View {
                     .font(Ben.Font.logo)
                     .foregroundColor(Ben.Color.forest)
                 Text("Your credit cards have a secret.")
-                    .font(Ben.Font.bodySmall)
+                    .font(Ben.Font.bodyLarge)
                     .foregroundColor(Ben.Color.textMuted)
             }
             .opacity(appeared ? 1 : 0)
@@ -91,7 +91,7 @@ struct WelcomeScreen: View {
             Spacer().frame(height: 20)
 
             Text("Your cards are packed with credits and perks.\nBen makes sure you actually use them.")
-                .font(Ben.Font.bodySmall)
+                .font(Ben.Font.body)
                 .foregroundColor(Ben.Color.textBody)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
@@ -142,7 +142,7 @@ struct ProblemScreen: View {
                         .padding(.top, 10)
 
                     Text("Premium cards offset their fees with credits — but most require enrollment, reset monthly, and are buried in apps nobody opens.")
-                        .font(Ben.Font.bodySmall)
+                        .font(Ben.Font.body)
                         .foregroundColor(Ben.Color.textBody)
                         .lineSpacing(4)
                         .padding(.top, 12)
@@ -199,7 +199,7 @@ struct HowItWorksScreen: View {
                     .padding(.top, 10)
 
                 Text("No manual tracking. No spreadsheets. No forgetting to enroll.")
-                    .font(Ben.Font.bodySmall)
+                    .font(Ben.Font.body)
                     .foregroundColor(Ben.Color.textBody)
                     .lineSpacing(4)
                     .padding(.top, 12)
@@ -250,7 +250,7 @@ struct DashboardPreviewScreen: View {
                     .padding(.top, 10)
 
                 Text("Ben's ROI meter shows what you've captured vs. what's still on the table — updated after every transaction.")
-                    .font(Ben.Font.bodySmall)
+                    .font(Ben.Font.body)
                     .foregroundColor(Ben.Color.textBody)
                     .lineSpacing(4)
                     .padding(.top, 12)
@@ -335,7 +335,7 @@ struct PaywallScreen: View {
                     .font(Ben.Font.logo)
                     .foregroundColor(Ben.Color.forest)
                 Text("Start for free. Pay only if you love it.")
-                    .font(Ben.Font.bodySmall)
+                    .font(Ben.Font.body)
                     .foregroundColor(Ben.Color.textMuted)
             }
             .opacity(appeared ? 1 : 0)
@@ -421,20 +421,21 @@ struct HeroStatCard: View {
             Text(label.uppercased())
                 .font(.system(size: 10, weight: .medium))
                 .tracking(1.0)
-                .foregroundColor(Ben.Color.mint)
+                .foregroundColor(Ben.Color.textMuted)
             Text(number)
                 .font(.custom("Georgia", size: 48).bold())
-                .foregroundColor(Ben.Color.mintLight)
+                .foregroundColor(Ben.Color.textPrimary)
                 .lineLimit(1)
             Text(description)
                 .font(.system(size: 12))
-                .foregroundColor(Ben.Color.mint)
+                .foregroundColor(Ben.Color.textMuted)
                 .lineSpacing(3)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Ben.Color.forest)
+        .background(Color.white)
         .cornerRadius(20)
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 }
 
@@ -487,16 +488,16 @@ struct StepRow: View {
                     .frame(width: 30, height: 30)
                 Text("\(number)")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Ben.Color.mintLight)
+                    .foregroundColor(.white)
             }
             .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundColor(Ben.Color.textPrimary)
                 Text(subtitle)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(Ben.Color.textMuted)
                     .lineSpacing(3)
             }
