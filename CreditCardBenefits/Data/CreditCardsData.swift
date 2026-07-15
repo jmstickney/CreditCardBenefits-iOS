@@ -477,6 +477,174 @@ struct CreditCardsData {
             annualFee: 550
         ),
 
+        // MARK: - Chase Sapphire Reserve for Business
+
+        CreditCard(
+            id: "chase-sapphire-reserve-business",
+            name: "Chase Sapphire Reserve for Business",
+            issuer: .chase,
+            benefits: [
+                // Annual Travel Credit
+                CreditCardBenefit(
+                    id: "csrb-travel",
+                    type: .travelCredit,
+                    name: "Travel Credit",
+                    description: "$300 annual travel credit",
+                    amount: 300,
+                    frequency: .annual,
+                    eligibleMerchants: [
+                        "TRAVEL CREDIT $300/YEAR", "TRAVEL CREDIT $300/YR",
+                        "TRAVEL CREDIT", "CHASE TRAVEL CREDIT",
+                        "SAPPHIRE TRAVEL CREDIT",
+                        "TRAVEL CREDIT $300", "$300 TRAVEL CREDIT",
+                        "ANNUAL TRAVEL CREDIT", "RESERVE TRAVEL CREDIT",
+                        "CHASE SAPPHIRE TRAVEL", "ULTIMATE REWARDS TRAVEL CREDIT",
+                        "TRAVEL STATEMENT CREDIT", "STATEMENT CREDIT - TRAVEL"
+                    ],
+                    category: "travel",
+                    conditions: "Automatically applied to travel purchases; resets each cardmember year",
+                    period: .cardmemberYear,
+                    eligibleCategories: ["Airlines", "Hotels", "Car Rental", "Travel"],
+                    canAutoDetect: true,
+                    requiresEnrollment: false,
+                    matchCreditTransactions: true
+                ),
+
+                // Semi-Annual / Calendar-Year Credits
+                CreditCardBenefit(
+                    id: "csrb-the-edit",
+                    type: .hotelCredit,
+                    name: "The Edit Hotels",
+                    description: "$250 twice per calendar year ($500/year)",
+                    amount: 500,
+                    frequency: .annual,
+                    eligibleMerchants: nil,
+                    category: "travel",
+                    conditions: "$250 per half (Jan-Jun / Jul-Dec) on prepaid The Edit bookings through Chase Travel",
+                    period: .calendarYear,
+                    canAutoDetect: false,  // Must book through Chase Travel
+                    requiresEnrollment: false
+                ),
+                CreditCardBenefit(
+                    id: "csrb-chase-travel-hotel",
+                    type: .hotelCredit,
+                    name: "Chase Travel Hotel Credit",
+                    description: "$250/year for select hotels through Chase Travel",
+                    amount: 250,
+                    frequency: .annual,
+                    eligibleMerchants: nil,
+                    category: "travel",
+                    conditions: "Prepaid 2+ night Chase Travel bookings: IHG, Montage, Pendry, Omni, Virgin, Minor, Pan Pacific",
+                    period: .calendarYear,
+                    canAutoDetect: false,  // Must book through Chase Travel
+                    requiresEnrollment: false
+                ),
+                CreditCardBenefit(
+                    id: "csrb-giftcards",
+                    type: .shoppingCredit,
+                    name: "GiftCards.com Credit",
+                    description: "$50 every 6 months ($100/year)",
+                    amount: 100,
+                    frequency: .annual,
+                    eligibleMerchants: [
+                        "GIFTCARDS.COM", "GiftCards.com", "GIFTCARDS COM",
+                        "GIFTCARDS.COM CREDIT", "STATEMENT CREDIT - GIFTCARDS"
+                    ],
+                    category: "shopping",
+                    conditions: "$50 Jan-Jun, $50 Jul-Dec on GiftCards.com",
+                    period: .calendarYear,
+                    canAutoDetect: true,
+                    requiresEnrollment: false,
+                    matchCreditTransactions: true
+                ),
+                CreditCardBenefit(
+                    id: "csrb-ziprecruiter",
+                    type: .subscriptionCredit,
+                    name: "ZipRecruiter Credit",
+                    description: "$200 every 6 months ($400/year)",
+                    amount: 400,
+                    frequency: .annual,
+                    eligibleMerchants: [
+                        "ZIPRECRUITER", "ZipRecruiter", "ZIP RECRUITER",
+                        "ZIPRECRUITER CREDIT", "STATEMENT CREDIT - ZIPRECRUITER"
+                    ],
+                    category: "business",
+                    conditions: "$200 Jan-Jun, $200 Jul-Dec on ZipRecruiter",
+                    period: .calendarYear,
+                    canAutoDetect: true,
+                    requiresEnrollment: false,
+                    matchCreditTransactions: true
+                ),
+                CreditCardBenefit(
+                    id: "csrb-google-workspace",
+                    type: .subscriptionCredit,
+                    name: "Google Workspace Credit",
+                    description: "$200 per calendar year",
+                    amount: 200,
+                    frequency: .annual,
+                    eligibleMerchants: [
+                        "GOOGLE WORKSPACE", "Google Workspace",
+                        "GOOGLE *WORKSPACE", "GOOGLE*WORKSPACE",
+                        "WORKSPACE CREDIT", "STATEMENT CREDIT - GOOGLE"
+                    ],
+                    category: "business",
+                    conditions: "$200 per calendar year on Google Workspace",
+                    period: .calendarYear,
+                    canAutoDetect: true,
+                    requiresEnrollment: false,
+                    matchCreditTransactions: true
+                ),
+
+                // Monthly Credits
+                CreditCardBenefit(
+                    id: "csrb-doordash-restaurant",
+                    type: .diningCredit,
+                    name: "DoorDash Restaurant Credit",
+                    description: "$5/month for restaurant orders ($60/year)",
+                    amount: 5,
+                    frequency: .monthly,
+                    eligibleMerchants: ["DoorDash", "Doordash", "DOORDASH"],
+                    category: "food",
+                    conditions: "$5/month promo credit in the DoorDash app; requires DashPass enrollment",
+                    period: .monthly,
+                    canAutoDetect: false,  // Applied in DoorDash app, not as statement credit
+                    requiresEnrollment: true,
+                    enrollmentUrl: "https://www.doordash.com/dashpass"
+                ),
+                CreditCardBenefit(
+                    id: "csrb-doordash-nonrestaurant",
+                    type: .shoppingCredit,
+                    name: "DoorDash Non-Restaurant Credits",
+                    description: "2 × $10/month for grocery/retail orders ($240/year)",
+                    amount: 20,
+                    frequency: .monthly,
+                    eligibleMerchants: ["DoorDash", "Doordash", "DOORDASH"],
+                    category: "food",
+                    conditions: "Two $10/month promo credits for non-restaurant orders in the DoorDash app; requires DashPass enrollment",
+                    period: .monthly,
+                    canAutoDetect: false,  // Applied in DoorDash app, not as statement credit
+                    requiresEnrollment: true,
+                    enrollmentUrl: "https://www.doordash.com/dashpass"
+                ),
+                CreditCardBenefit(
+                    id: "csrb-lyft",
+                    type: .rideshareCredit,
+                    name: "Lyft Credit",
+                    description: "$10/month through Lyft app ($120/year)",
+                    amount: 10,
+                    frequency: .monthly,
+                    eligibleMerchants: ["Lyft", "LYFT"],
+                    category: "rideshare",
+                    conditions: "$10/month in-app Lyft credit",
+                    period: .monthly,
+                    canAutoDetect: false,  // Applied in Lyft app
+                    requiresEnrollment: true,
+                    enrollmentUrl: "https://www.lyft.com/chase"
+                )
+            ],
+            annualFee: 795
+        ),
+
         // MARK: - Capital One Venture X
 
         CreditCard(

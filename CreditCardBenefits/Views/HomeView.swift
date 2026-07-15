@@ -10,8 +10,14 @@ import Combine
 
 struct HomeView: View {
     @EnvironmentObject var dataManager: AppDataManager
-    @State private var showingAddCard = false
-    @State private var linkToken: String?
+    @State private var linkTokenItem: LinkTokenItem?
+    @State private var showSignIn = false
+    @State private var showingCapturedBreakdown = false
+
+    private struct LinkTokenItem: Identifiable {
+        let id = UUID()
+        let token: String
+    }
     
     // Computed properties for HomeHeaderView
     private var totalUsedValue: Double {
@@ -36,7 +42,8 @@ struct HomeView: View {
                         usedValue: totalUsedValue,
                         totalFees: totalAnnualFees,
                         cardCount: dataManager.userCards.count,
-                        unusedBenefitCount: unusedBenefitCount
+                        unusedBenefitCount: unusedBenefitCount,
+                        onHeroTap: { showingCapturedBreakdown = true }
                     )
                     
                     // Accounts section
@@ -49,20 +56,35 @@ struct HomeView: View {
                                 Spacer()
                                 
                                 Button(action: {
-                                    Task {
-                                        await handleAddCard()
+                                    if dataManager.authService.isAuthenticated {
+                                        Task { await handleAddCard() }
+                                    } else {
+                                        showSignIn = true
                                     }
                                 }) {
                                     Image(systemName: "plus")
                                         .font(.system(size: 18, weight: .semibold))
                                         .foregroundColor(Ben.Color.forest)
                                 }
+                                .authGate(
+                                    isPresented: $showSignIn,
+                                    dataManager: dataManager
+                                ) {
+                                    Task { await handleAddCard() }
+                                }
                             }
                             .padding(.horizontal, 20)
 
                             // Card list
                             if dataManager.userCards.isEmpty {
-                                EmptyAccountsView()
+                                EmptyAccountsView {
+                                    if dataManager.authService.isAuthenticated {
+                                        Task { await handleAddCard() }
+                                    } else {
+                                        showSignIn = true
+                                    }
+                                }
+                                .padding(.horizontal, 20)
                             } else {
                                 VStack(spacing: 0) {
                                     ForEach(Array(dataManager.userCards.enumerated()), id: \.element.id) { index, card in
@@ -90,23 +112,6 @@ struct HomeView: View {
                             }
                     }
 
-                    // Recommendations section (if any)
-                    if !dataManager.recommendations.isEmpty {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Don't Miss Out")
-                                .font(Ben.Font.bodyLarge)
-                                .foregroundColor(Ben.Color.textPrimary)
-                                .padding(.horizontal, 20)
-                                .padding(.top, 32)
-
-                            ForEach(dataManager.recommendations.prefix(2)) { recommendation in
-                                AmexStyleRecommendationCard(recommendation: recommendation) {
-                                    handleRecommendationTap(recommendation)
-                                }
-                            }
-                        }
-                    }
-
                     Spacer(minLength: 100)
                 }
             }
@@ -123,31 +128,30 @@ struct HomeView: View {
                     dataManager.loadData(from: newTransactions)
                 }
             }
-            .alert("Error", isPresented: $dataManager.showError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                if let error = dataManager.error {
-                    Text(error.localizedDescription)
-                }
+            .sheet(isPresented: $showingCapturedBreakdown) {
+                BenefitsCapturedBreakdownView(
+                    title: "Benefits Captured",
+                    total: totalUsedValue,
+                    contributions: BenefitsCapturedBreakdownView.makeContributions(
+                        from: dataManager.utilizationService.utilizations,
+                        transactions: dataManager.plaidService.transactions
+                    ),
+                    showCardName: true
+                )
             }
-            .sheet(isPresented: $dataManager.needsCardConfirmation) {
-                CardSelectionView()
-            }
-            .sheet(isPresented: $showingAddCard) {
-                if let linkToken = linkToken {
-                    PlaidLinkView(
-                        linkToken: linkToken,
-                        onSuccess: { publicToken in
-                            Task {
-                                await dataManager.plaidService.exchangePublicToken(publicToken)
-                                showingAddCard = false
-                            }
-                        },
-                        onExit: {
-                            showingAddCard = false
+            .sheet(item: $linkTokenItem) { item in
+                PlaidLinkView(
+                    linkToken: item.token,
+                    onSuccess: { publicToken in
+                        Task {
+                            await dataManager.plaidService.exchangePublicToken(publicToken)
+                            linkTokenItem = nil
                         }
-                    )
-                }
+                    },
+                    onExit: {
+                        linkTokenItem = nil
+                    }
+                )
             }
             .onChange(of: dataManager.plaidService.accounts) { _, newAccounts in
                 if !dataManager.isRestoringState && !newAccounts.isEmpty {
@@ -164,10 +168,11 @@ struct HomeView: View {
     
     // MARK: - Add Card Action
     
+    @MainActor
     private func handleAddCard() async {
         do {
-            linkToken = try await dataManager.plaidService.createLinkToken()
-            showingAddCard = true
+            let token = try await dataManager.plaidService.createLinkToken()
+            linkTokenItem = LinkTokenItem(token: token)
         } catch {
             dataManager.error = .network(error.localizedDescription)
             dataManager.showError = true
@@ -301,23 +306,36 @@ struct AmexStyleRecommendationCard: View {
 // MARK: - Empty State
 
 struct EmptyAccountsView: View {
+    let onConnect: () -> Void
+
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "creditcard")
-                .font(.system(size: 48))
-                .foregroundColor(Ben.Color.textMuted.opacity(0.3))
-            
-            Text("No cards connected")
-                .font(Ben.Font.body)
-                .foregroundColor(Ben.Color.textBody)
-            
-            Text("Connect your bank account to get started")
-                .font(Ben.Font.bodySmall)
-                .foregroundColor(Ben.Color.textMuted)
-                .multilineTextAlignment(.center)
+        VStack(spacing: Ben.Spacing.md) {
+            ZStack {
+                Circle()
+                    .fill(Ben.Color.forest.opacity(0.08))
+                    .frame(width: 84, height: 84)
+                Image(systemName: "creditcard.fill")
+                    .font(.system(size: 36, weight: .medium))
+                    .foregroundColor(Ben.Color.forest)
+            }
+
+            VStack(spacing: Ben.Spacing.xs) {
+                Text("Add your first card")
+                    .font(Ben.Font.bodyLarge)
+                    .foregroundColor(Ben.Color.textPrimary)
+
+                Text("Connect your bank to automatically track your card benefits — so you never leave money on the table.")
+                    .font(Ben.Font.bodySmall)
+                    .foregroundColor(Ben.Color.textMuted)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            BenPrimaryButton(title: "Connect a Card", action: onConnect)
+                .padding(.top, Ben.Spacing.xs)
         }
         .frame(maxWidth: .infinity)
-        .benCard(padding: 40)
+        .benCard(padding: Ben.Spacing.xl)
     }
 }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 
 // MARK: - Root Onboarding View
 struct BenOnboardingView: View {
@@ -240,7 +241,7 @@ struct DashboardPreviewScreen: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                TagLabel(text: "Your annual fee scorecard")
+                TagLabel(text: "Your annual fee scorecard · Example")
                     .padding(.top, 24)
 
                 Text("Know exactly\nwhere you stand.")
@@ -290,6 +291,10 @@ struct DashboardPreviewScreen: View {
                         .font(Ben.Font.micro)
                         .foregroundColor(Ben.Color.warn)
                         .frame(maxWidth: .infinity, alignment: .trailing)
+
+                    Text("Sample data for illustration")
+                        .font(Ben.Font.micro)
+                        .foregroundColor(Ben.Color.textMuted)
                 }
                 .padding(18)
                 .background(Ben.Color.sand)
@@ -316,7 +321,21 @@ struct DashboardPreviewScreen: View {
 // MARK: - Screen 5: Paywall
 struct PaywallScreen: View {
     let onComplete: () -> Void
+    @EnvironmentObject var dataManager: AppDataManager
     @State private var appeared = false
+    @State private var errorMessage: String?
+
+    /// Update once the privacy policy is hosted (also goes in App Store Connect).
+    private let privacyPolicyURL = URL(string: "https://getben.app/privacy-policy")!
+    /// Apple's standard EULA — allowed as Terms of Use for App Review 3.1.2.
+    private let termsOfUseURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+
+    private var subscriptions: SubscriptionManager { dataManager.subscriptionService }
+
+    /// Live App Store price when loaded; falls back to the configured price.
+    private var priceText: String {
+        subscriptions.product?.displayPrice ?? "$4.99"
+    }
 
     let features = [
         "Benefits tracker for all your cards",
@@ -343,8 +362,8 @@ struct PaywallScreen: View {
 
             Spacer().frame(height: 20)
 
-            // Price pill
-            Text("7 days free  ·  then $4.99 / month")
+            // Price pill (live App Store price)
+            Text("7 days free  ·  then \(priceText) / month")
                 .font(Ben.Font.caption)
                 .foregroundColor(Ben.Color.textBody)
                 .padding(.horizontal, 16)
@@ -397,8 +416,30 @@ struct PaywallScreen: View {
             Spacer()
 
             VStack(spacing: 8) {
-                BenButton(title: "Start free trial →", action: onComplete)
-                BenGhostButton(title: "Restore purchase", action: {})
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(Ben.Font.caption)
+                        .foregroundColor(Ben.Color.warn)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 8)
+                }
+
+                if subscriptions.isPurchasing {
+                    ProgressView()
+                        .frame(height: 52)
+                } else {
+                    BenButton(title: "Start free trial →", action: { startTrial() })
+                    BenGhostButton(title: "Restore purchase", action: { restore() })
+                }
+
+                // Required for auto-renewable subscriptions (App Review 3.1.2).
+                HStack(spacing: 16) {
+                    Link("Terms of Use", destination: termsOfUseURL)
+                    Link("Privacy Policy", destination: privacyPolicyURL)
+                }
+                .font(.system(size: 11))
+                .foregroundColor(Ben.Color.textMuted)
+                .padding(.top, 4)
             }
             .padding(.horizontal, 28)
             .padding(.bottom, 56)
@@ -406,6 +447,37 @@ struct PaywallScreen: View {
             .animation(.easeOut(duration: 0.4).delay(0.5), value: appeared)
         }
         .onAppear { appeared = true }
+    }
+
+    // MARK: - Purchase Actions
+
+    private func startTrial() {
+        errorMessage = nil
+        Task {
+            do {
+                if try await subscriptions.purchase() {
+                    onComplete()
+                }
+                // Cancelled/pending: stay on the paywall silently.
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func restore() {
+        errorMessage = nil
+        Task {
+            do {
+                if try await subscriptions.restore() {
+                    onComplete()
+                } else {
+                    errorMessage = "No previous purchase found for this Apple ID."
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 }
 
@@ -541,4 +613,5 @@ typealias BenButton = BenPrimaryButton
 // MARK: - Preview
 #Preview {
     BenOnboardingView()
+        .environmentObject(AppDataManager())
 }

@@ -8,13 +8,25 @@
 import UserNotifications
 import Foundation
 
-final class NotificationManager {
+final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
     static let shared = NotificationManager()
 
     private let center = UNUserNotificationCenter.current()
 
-    private init() {}
+    private override init() { super.init() }
+
+    // MARK: - Foreground Presentation
+
+    /// Show benefit notifications even when the app is open (iOS suppresses the
+    /// banner by default). Set as the center delegate at launch.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .list, .sound])
+    }
 
     // MARK: - Permission
 
@@ -171,6 +183,131 @@ final class NotificationManager {
         }
 
         benLog("✅ Scheduled \(scheduled) notification reminders")
+    }
+
+    // MARK: - Benefit Auto-Match Notifications
+
+    /// How recent a matched transaction must be to be notification-worthy.
+    /// Guards against a flood when older statement credits backfill (e.g. after
+    /// assigning a newly-added card).
+    private static let matchRecencyDays = 14
+
+    /// UserDefaults key backing the "notify me when a benefit is auto-tracked"
+    /// Settings toggle. Bound via @AppStorage in SettingsView; read here.
+    static let benefitMatchNotificationsKey = "notifyOnBenefitMatch"
+
+    /// Whether the user wants benefit auto-match notifications. Defaults ON when
+    /// they haven't set a preference.
+    private var benefitMatchNotificationsEnabled: Bool {
+        UserDefaults.standard.object(forKey: Self.benefitMatchNotificationsKey) as? Bool ?? true
+    }
+
+    /// Fires a local notification when Ben auto-detects that a benefit credit was
+    /// used (a new transaction matched an auto-detect benefit). Safe to call after
+    /// every processing pass — it de-dupes against a persisted set of already-
+    /// notified transaction IDs and seeds a silent baseline on first run so it
+    /// never fires for a user's historical matches.
+    func notifyNewlyMatchedBenefits(
+        utilizations: [BenefitUtilization],
+        userCards: [CreditCard],
+        transactions: [Transaction]
+    ) async {
+        let txnById = Dictionary(transactions.map { ($0.id, $0) },
+                                 uniquingKeysWith: { first, _ in first })
+        let recentCutoff = Calendar.current.date(
+            byAdding: .day, value: -Self.matchRecencyDays, to: Date()
+        ) ?? .distantPast
+
+        let seenList = CacheManager.shared.load([String].self, for: .notifiedMatchIds)
+        let seen = Set(seenList ?? [])
+
+        var currentMatchedIds = Set<String>()
+        var events: [MatchEvent] = []
+
+        for utilization in utilizations {
+            guard let benefit = CreditCardsData.getBenefit(by: utilization.benefitId),
+                  benefit.canAutoDetect else { continue }
+            let cardName = userCards.first(where: { $0.id == utilization.cardId })?.name
+                ?? CreditCardsData.getCard(by: utilization.cardId)?.name
+                ?? "your card"
+
+            for txnId in utilization.matchedTransactionIds {
+                currentMatchedIds.insert(txnId)
+                guard !seen.contains(txnId), let txn = txnById[txnId] else { continue }
+                if txn.date >= recentCutoff {
+                    events.append(MatchEvent(benefit: benefit, cardName: cardName, transaction: txn))
+                }
+            }
+        }
+
+        // First run for this user: record the baseline silently so we don't
+        // notify for everything that was already matched before this feature ran.
+        guard seenList != nil else {
+            CacheManager.shared.save(Array(currentMatchedIds), for: .notifiedMatchIds)
+            return
+        }
+
+        guard !events.isEmpty else { return }
+
+        // Even if we don't fire, mark these as seen so we don't queue a backlog
+        // to fire the moment the user re-enables the toggle / grants permission.
+        let persistSeen = { CacheManager.shared.save(Array(seen.union(currentMatchedIds)), for: .notifiedMatchIds) }
+
+        guard benefitMatchNotificationsEnabled else {
+            persistSeen()
+            return
+        }
+
+        guard await isAuthorized() else {
+            persistSeen()
+            return
+        }
+
+        await fireMatchNotifications(events)
+        persistSeen()
+    }
+
+    private struct MatchEvent {
+        let benefit: CreditCardBenefit
+        let cardName: String
+        let transaction: Transaction
+    }
+
+    private func fireMatchNotifications(_ events: [MatchEvent]) async {
+        // A handful → notify individually; a burst → collapse into one summary.
+        if events.count <= 3 {
+            for event in events {
+                let content = UNMutableNotificationContent()
+                content.title = "Benefit credit tracked ✅"
+                content.body = "\(event.transaction.amount.asCurrency()) toward your "
+                    + "\(event.benefit.name) on \(event.cardName)"
+                    + " — detected at \(event.transaction.merchant)."
+                content.sound = .default
+
+                let request = UNNotificationRequest(
+                    identifier: "match-\(event.transaction.id)",
+                    content: content,
+                    trigger: nil // deliver immediately
+                )
+                try? await center.add(request)
+            }
+        } else {
+            let total = events.reduce(0.0) { $0 + $1.transaction.amount }
+            let content = UNMutableNotificationContent()
+            content.title = "Benefit credits tracked ✅"
+            content.body = "Ben detected \(events.count) benefit credits worth "
+                + "\(total.asCurrency()). Open Ben to see the details."
+            content.sound = .default
+
+            let request = UNNotificationRequest(
+                identifier: "match-summary-\(Int(Date().timeIntervalSince1970))",
+                content: content,
+                trigger: nil
+            )
+            try? await center.add(request)
+        }
+
+        benLog("🔔 Fired benefit-match notifications: \(events.count)")
     }
 
     // MARK: - Cancel All

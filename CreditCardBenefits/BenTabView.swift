@@ -7,6 +7,7 @@ import SwiftUI
 
 struct BenTabView: View {
 
+    @EnvironmentObject var dataManager: AppDataManager
     @State private var selectedTab: BenTab = .home
     @State private var showingNotifications = false
 
@@ -31,6 +32,12 @@ struct BenTabView: View {
             // ── Cards ─────────────────────────────────────────────
             NavigationStack {
                 CardsListView()
+                    // Rebuild fresh whenever local data is wiped (sign-out /
+                    // disconnect) so this inactive tab can't show a stale
+                    // snapshot of the previous user's cards. Keyed on the clear
+                    // counter (not auth) so signing in to add a card mid-flow
+                    // doesn't tear down the in-progress add-card sheet.
+                    .id(dataManager.clearGeneration)
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { cardsToolbar }
                     .toolbarBackground(Ben.Color.cream, for: .navigationBar)
@@ -58,6 +65,18 @@ struct BenTabView: View {
         }
         .tint(Ben.Color.forest)                        // active tab + icon color
         .onAppear { styleTabBar() }
+        // App-level so they present over whichever tab is active — a bank can
+        // now be connected from either Home or the Cards tab.
+        .sheet(isPresented: $dataManager.needsCardConfirmation) {
+            CardSelectionView()
+        }
+        .alert("Error", isPresented: $dataManager.showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            if let error = dataManager.error {
+                Text(error.localizedDescription)
+            }
+        }
     }
 
     // MARK: - Tab enum
@@ -109,15 +128,8 @@ struct BenTabView: View {
                 .font(Ben.Font.serif(20))
                 .foregroundColor(Ben.Color.forest)
         }
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button {
-                // TODO: add card
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(Ben.Color.forest)
-            }
-        }
+        // Trailing "+" (add card) is provided by CardsListView, which owns the
+        // add-card flow.
     }
 
     @ToolbarContentBuilder
@@ -180,4 +192,5 @@ struct CardDetailToolbar: ToolbarContent {
 // MARK: - Preview
 #Preview {
     BenTabView()
+        .environmentObject(AppDataManager())
 }

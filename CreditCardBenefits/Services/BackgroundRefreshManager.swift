@@ -152,7 +152,10 @@ final class BackgroundRefreshManager {
             return
         }
 
-        await plaidService.fetchTransactions()
+        // Trigger a server-side sync, then read the stored transactions
+        // (one-shot, since a live listener isn't useful in a background task).
+        await plaidService.refreshTransactions()
+        await plaidService.fetchStoredTransactions()
 
         guard !plaidService.transactions.isEmpty else {
             benLog("BG Refresh: No transactions fetched")
@@ -183,6 +186,13 @@ final class BackgroundRefreshManager {
             userId: user.uid
         )
         try? await utilizationService.saveAllUtilizations(userId: user.uid)
+
+        // Surface a notification for any benefit credits detected while away.
+        await NotificationManager.shared.notifyNewlyMatchedBenefits(
+            utilizations: utilizationService.utilizations,
+            userCards: userCards,
+            transactions: plaidService.transactions
+        )
 
         // Save everything to cache
         cache.save(plaidService.transactions, for: .transactions)

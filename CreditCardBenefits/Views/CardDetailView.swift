@@ -15,6 +15,7 @@ struct CardDetailView: View {
     @EnvironmentObject var dataManager: AppDataManager
     @Environment(\.presentationMode) var presentationMode
     @State private var showingAnniversaryPicker = false
+    @State private var showingCapturedBreakdown = false
 
     private var utilizations: [BenefitUtilization] {
         dataManager.utilizationService.utilizationsForCard(card.id)
@@ -74,7 +75,8 @@ struct CardDetailView: View {
                     BenefitProgressHeroCard(
                         label: "Benefits Captured",
                         usedValue: totalUtilizedAnnual,
-                        totalFees: card.annualFee
+                        totalFees: card.annualFee,
+                        onTap: { showingCapturedBreakdown = true }
                     )
                     .padding(.horizontal, 20)
                     .padding(.bottom, 24)
@@ -132,7 +134,7 @@ struct CardDetailView: View {
                         ForEach(card.benefits) { benefit in
                             AmexBenefitRow(
                                 benefit: benefit,
-                                utilization: dataManager.utilizationService.utilizationForBenefit(benefit.id, cardId: card.id)
+                                cardId: card.id
                             )
                             .environmentObject(dataManager)
                         }
@@ -162,6 +164,17 @@ struct CardDetailView: View {
         }
         .toolbarBackground(Ben.Color.cream, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .sheet(isPresented: $showingCapturedBreakdown) {
+            BenefitsCapturedBreakdownView(
+                title: "Benefits Captured",
+                total: totalUtilizedAnnual,
+                contributions: BenefitsCapturedBreakdownView.makeContributions(
+                    from: utilizations,
+                    transactions: dataManager.plaidService.transactions
+                ),
+                showCardName: false
+            )
+        }
         .sheet(isPresented: $showingAnniversaryPicker) {
             if let plaidAccount = cardMatch?.plaidAccount {
                 EditAnniversaryDateView(
@@ -184,34 +197,54 @@ struct CardDetailView: View {
 
 struct AmexBenefitRow: View {
     let benefit: CreditCardBenefit
-    let utilization: BenefitUtilization?
+    let cardId: String
     @EnvironmentObject var dataManager: AppDataManager
     @State private var showingTransactions = false
     @State private var showingManualToggle = false
 
-    private var isUsed: Bool {
-        guard let utilization = utilization else { return false }
-        return utilization.amountUtilized > 0 || utilization.isManuallyMarked
+    // All utilization records for this benefit on this card, across periods.
+    private var benefitUtilizations: [BenefitUtilization] {
+        dataManager.utilizationService.utilizations.filter {
+            $0.benefitId == benefit.id && $0.cardId == cardId
+        }
     }
 
+    // Current-period record — drives manual marking + manual status, matching
+    // the period the manual toggle writes to.
+    private var currentUtilization: BenefitUtilization? {
+        dataManager.utilizationService.utilizationForBenefit(benefit.id, cardId: cardId)
+    }
+
+    // Year-to-date figures so the row reconciles with the "Benefits Captured"
+    // hero and its breakdown. A monthly credit captured in earlier months still
+    // shows here even if the current month hasn't posted yet (the bug this fixes).
     private var amountUsed: Double {
-        utilization?.amountUtilized ?? 0
+        BenefitPeriodHelper.yearToDateUtilized(benefitUtilizations)
+    }
+
+    private var totalValue: Double {
+        benefit.annualAmount
     }
 
     private var utilizationPercentage: Double {
-        utilization?.utilizationPercentage ?? 0
+        guard totalValue > 0 else { return 0 }
+        return min(amountUsed / totalValue, 1.0)
     }
-    
+
     private var matchedTransactions: [Transaction] {
-        guard let utilization = utilization else { return [] }
-        let transactionIds = Set(utilization.matchedTransactionIds)
+        let ytdRecords = BenefitPeriodHelper.yearToDateRecords(benefitUtilizations)
+        let transactionIds = Set(ytdRecords.flatMap { $0.matchedTransactionIds })
         return dataManager.plaidService.transactions.filter { transactionIds.contains($0.id) }
     }
-    
+
     private var isManuallyMarked: Bool {
-        utilization?.isManuallyMarked ?? false
+        currentUtilization?.isManuallyMarked ?? false
     }
-    
+
+    private var isUsed: Bool {
+        amountUsed > 0 || isManuallyMarked
+    }
+
     private var canAutoDetect: Bool {
         benefit.canAutoDetect
     }
@@ -295,7 +328,8 @@ struct AmexBenefitRow: View {
             .sheet(isPresented: $showingTransactions) {
                 BenefitTransactionsView(
                     benefit: benefit,
-                    utilization: utilization,
+                    amountUsed: amountUsed,
+                    totalValue: totalValue,
                     transactions: matchedTransactions
                 )
                 .environmentObject(dataManager)
@@ -303,8 +337,8 @@ struct AmexBenefitRow: View {
             .sheet(isPresented: $showingManualToggle) {
                 ManualBenefitToggleView(
                     benefit: benefit,
-                    utilization: utilization,
-                    cardId: dataManager.userCards.first(where: { $0.benefits.contains(where: { $0.id == benefit.id }) })?.id ?? ""
+                    utilization: currentUtilization,
+                    cardId: cardId
                 )
             }
         }
@@ -315,7 +349,8 @@ struct AmexBenefitRow: View {
 
 struct BenefitTransactionsView: View {
     let benefit: CreditCardBenefit
-    let utilization: BenefitUtilization?
+    let amountUsed: Double
+    let totalValue: Double
     let transactions: [Transaction]
     @EnvironmentObject var dataManager: AppDataManager
     @Environment(\.dismiss) private var dismiss
@@ -364,31 +399,29 @@ struct BenefitTransactionsView: View {
                                 .font(Ben.Font.bodySmall)
                                 .foregroundColor(Ben.Color.textMuted)
                             
-                            if let utilization = utilization {
-                                Divider()
-                                    .background(Ben.Color.sandBorder)
-                                    .padding(.vertical, 8)
-                                
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("Amount Used")
-                                            .font(Ben.Font.caption)
-                                            .foregroundColor(Ben.Color.textMuted)
-                                        Text(utilization.amountUtilized.asCurrency())
-                                            .font(.system(size: 18, weight: .bold))
-                                            .foregroundColor(Ben.Color.mintDark)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    VStack(alignment: .trailing, spacing: 4) {
-                                        Text("Remaining")
-                                            .font(Ben.Font.caption)
-                                            .foregroundColor(Ben.Color.textMuted)
-                                        Text(utilization.amountRemaining.asCurrency())
-                                            .font(.system(size: 18, weight: .bold))
-                                            .foregroundColor(Ben.Color.textPrimary)
-                                    }
+                            Divider()
+                                .background(Ben.Color.sandBorder)
+                                .padding(.vertical, 8)
+
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Used this year")
+                                        .font(Ben.Font.caption)
+                                        .foregroundColor(Ben.Color.textMuted)
+                                    Text(amountUsed.asCurrency())
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(Ben.Color.mintDark)
+                                }
+
+                                Spacer()
+
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    Text("Remaining")
+                                        .font(Ben.Font.caption)
+                                        .foregroundColor(Ben.Color.textMuted)
+                                    Text(max(totalValue - amountUsed, 0).asCurrency())
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(Ben.Color.textPrimary)
                                 }
                             }
                         }

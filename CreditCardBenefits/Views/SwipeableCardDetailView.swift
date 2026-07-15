@@ -111,14 +111,6 @@ struct CompactCardListView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Log out") {
-                        // Handle logout
-                    }
-                    .foregroundColor(Ben.Color.forest)
-                }
-            }
             .preferredColorScheme(.light)
         }
     }
@@ -130,9 +122,11 @@ struct CompactCardRow: View {
     let card: CreditCard
     @EnvironmentObject var dataManager: AppDataManager
     
+    // Year-to-date, consistent with the cards list, hero, and breakdown.
     private var totalUtilized: Double {
-        let utilizations = dataManager.utilizationService.utilizationsForCard(card.id)
-        return utilizations.reduce(0.0) { $0 + $1.amountUtilized }
+        BenefitPeriodHelper.yearToDateUtilized(
+            dataManager.utilizationService.utilizationsForCard(card.id)
+        )
     }
     
     var body: some View {

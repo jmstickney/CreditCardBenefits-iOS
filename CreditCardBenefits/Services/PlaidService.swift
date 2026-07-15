@@ -8,6 +8,8 @@
 import Foundation
 import FirebaseCore
 import FirebaseFunctions
+import FirebaseFirestore
+import FirebaseAuth
 import Combine
 import LinkKit
 
@@ -20,6 +22,8 @@ class PlaidService: ObservableObject {
     @Published var dataSource: DataSource = .none
 
     private let functions = Functions.functions()
+    private let db = Firestore.firestore()
+    private var transactionsListener: ListenerRegistration?
 
     // MARK: - Check Existing Connection
 
@@ -201,9 +205,11 @@ class PlaidService: ObservableObject {
 
             benLog("✅ Public token exchanged successfully")
 
-            // Fetch accounts and transactions after linking
+            // Fetch accounts; start the live transactions listener; and ask the
+            // server to pull transactions now (a safety net beyond the webhook).
             await fetchAccounts()
-            await fetchTransactions()
+            startTransactionsListener()
+            await refreshTransactions()
 
         } catch {
             await MainActor.run {
@@ -240,8 +246,8 @@ class PlaidService: ObservableObject {
 
             benLog("✅ Demo data populated: \(transactionCount) transactions created")
 
-            // Automatically fetch the demo transactions we just created
-            await fetchTransactions()
+            // Demo transactions were written server-side; stream them in.
+            startTransactionsListener()
 
         } catch {
             await MainActor.run {
@@ -257,6 +263,7 @@ class PlaidService: ObservableObject {
 
     /// Disconnects the bank account and clears local data
     func disconnect() async {
+        stopTransactionsListener()
         await MainActor.run {
             self.isLinked = false
             self.dataSource = .none
@@ -321,52 +328,64 @@ class PlaidService: ObservableObject {
         }
     }
 
-    // MARK: - Fetch Transactions
+    // MARK: - Transactions (Firestore-backed)
 
-    /// Fetches transactions from Plaid via Firebase Cloud Function
-    func fetchTransactions() async {
-        await MainActor.run {
-            isLoading = true
+    /// Firestore query for the signed-in user's transactions, newest first.
+    private func transactionsQuery() -> Query? {
+        guard let uid = Auth.auth().currentUser?.uid else { return nil }
+        return db.collection("users").document(uid)
+            .collection("transactions")
+            .order(by: "date", descending: true)
+    }
+
+    /// Streams the user's transactions from Firestore so the UI updates live as
+    /// the server syncs them in. Safe to call repeatedly.
+    func startTransactionsListener() {
+        guard let query = transactionsQuery() else { return }
+        transactionsListener?.remove()
+        transactionsListener = query.addSnapshotListener { [weak self] snapshot, error in
+            guard let self else { return }
+            if let error = error {
+                benLog("❌ Transactions listener error: \(error.localizedDescription)")
+                return
+            }
+            let dicts = snapshot?.documents.map { $0.data() } ?? []
+            let parsed = self.parseTransactions(dicts)
+            self.transactions = parsed
+            if !parsed.isEmpty { self.isLinked = true }
+            benLog("✅ Transactions updated: \(parsed.count)")
         }
+    }
 
+    /// Stops the live transactions listener (e.g. on sign-out / disconnect).
+    func stopTransactionsListener() {
+        transactionsListener?.remove()
+        transactionsListener = nil
+    }
+
+    /// One-shot read of stored transactions, for contexts where a listener is
+    /// not appropriate (e.g. background refresh).
+    func fetchStoredTransactions() async {
+        guard let query = transactionsQuery() else { return }
         do {
-            let calendar = Calendar.current
-            let endDate = Date()
-            // Pull up to 24 months so annual benefits can backfill against last
-            // cardmember year transactions. Plaid link is configured to request
-            // 730 days of history; this matches that window.
-            let startDate = calendar.date(byAdding: .day, value: -730, to: endDate) ?? endDate
-
-            let dateFormatter = ISO8601DateFormatter()
-            let startDateString = String(dateFormatter.string(from: startDate).split(separator: "T")[0])
-            let endDateString = String(dateFormatter.string(from: endDate).split(separator: "T")[0])
-
-            let result = try await functions.httpsCallable("getTransactions").call([
-                "startDate": startDateString,
-                "endDate": endDateString
-            ])
-
-            guard let data = result.data as? [String: Any],
-                  let transactionsData = data["transactions"] as? [[String: Any]] else {
-                throw PlaidError.invalidResponse
-            }
-
-            // Parse transactions
-            let parsedTransactions = parseTransactions(transactionsData)
-
-            await MainActor.run {
-                self.transactions = parsedTransactions
-                self.isLoading = false
-            }
-
-            benLog("✅ Fetched \(parsedTransactions.count) transactions")
-
+            let snapshot = try await query.getDocuments()
+            let parsed = parseTransactions(snapshot.documents.map { $0.data() })
+            await MainActor.run { self.transactions = parsed }
+            benLog("✅ Loaded \(parsed.count) stored transactions")
         } catch {
-            await MainActor.run {
-                self.error = error.localizedDescription
-                self.isLoading = false
-            }
-            benLog("❌ Error fetching transactions: \(error.localizedDescription)")
+            benLog("❌ Error loading stored transactions: \(error.localizedDescription)")
+        }
+    }
+
+    /// Asks the server to pull the latest transactions from Plaid (via
+    /// /transactions/sync). Results arrive through the Firestore listener.
+    func refreshTransactions() async {
+        do {
+            _ = try await functions.httpsCallable("refreshTransactions").call()
+            benLog("✅ Requested server transaction sync")
+        } catch {
+            await MainActor.run { self.error = error.localizedDescription }
+            benLog("❌ refreshTransactions error: \(error.localizedDescription)")
         }
     }
 
@@ -382,9 +401,15 @@ class PlaidService: ObservableObject {
             guard let transactionId = dict["transaction_id"] as? String,
                   let dateString = dict["date"] as? String,
                   let merchant = dict["name"] as? String,
-                  let amount = dict["amount"] as? Double,
                   let accountId = dict["account_id"] as? String else {
-                benLog("⚠️ Skipping transaction with missing required fields: \(dict)")
+                benLog("⚠️ Skipping transaction with missing required fields")
+                return nil
+            }
+
+            // Firestore may return whole-number amounts as Int, so bridge via
+            // NSNumber to robustly get a Double.
+            guard let amount = (dict["amount"] as? NSNumber)?.doubleValue else {
+                benLog("⚠️ Skipping transaction with invalid amount")
                 return nil
             }
 

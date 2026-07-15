@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import Combine
 import FirebaseAuth
+import FirebaseFunctions
 
 @MainActor
 class AppDataManager: ObservableObject {
@@ -17,6 +18,7 @@ class AppDataManager: ObservableObject {
     @Published var authService = AuthService()
     @Published var cardMappingService = CardMappingService()
     @Published var utilizationService = BenefitUtilizationService()
+    @Published var subscriptionService = SubscriptionManager()
 
     // Core Data
     @Published var userCards: [CreditCard] = []
@@ -39,6 +41,14 @@ class AppDataManager: ObservableObject {
     // State restoration
     @Published var isRestoring = false
     @Published var isRestoringState = false
+
+    /// Bumped whenever local data is wiped (sign-out / disconnect / clear).
+    /// Views that can hold a stale snapshot in an inactive tab key their
+    /// identity on this so they rebuild fresh — without also rebuilding on
+    /// sign-in / connect (which would interrupt in-flight flows).
+    @Published var clearGeneration = 0
+
+    private var cancellables = Set<AnyCancellable>()
 
     init() {
         // Initialize with empty stats
@@ -66,6 +76,22 @@ class AppDataManager: ObservableObject {
 
         // Don't load mock data by default - user can load via Settings > Developer Tools
         // This ensures the app starts fresh and shows real data when connected
+
+        // Re-publish nested service changes so views observing AppDataManager
+        // update immediately when auth / Plaid / utilization state changes.
+        // Without this, a nested change (e.g. sign-out flipping isAuthenticated)
+        // doesn't re-render observers until some unrelated update happens.
+        for publisher in [
+            authService.objectWillChange,
+            plaidService.objectWillChange,
+            utilizationService.objectWillChange,
+            cardMappingService.objectWillChange,
+            subscriptionService.objectWillChange,
+        ] {
+            publisher
+                .sink { [weak self] _ in self?.objectWillChange.send() }
+                .store(in: &cancellables)
+        }
     }
 
     // MARK: - State Restoration
@@ -74,22 +100,23 @@ class AppDataManager: ObservableObject {
     func restoreState() async {
         isRestoringState = true
 
+        // Data is per-user: only load anything when a user is signed in.
+        // Auth.currentUser is restored synchronously at launch (before the
+        // auth-state listener fires), so instant launch from cache still works
+        // for returning signed-in users while signed-out users see nothing.
+        guard Auth.auth().currentUser != nil else {
+            benLog("ℹ️ No signed-in user; skipping cached + network data")
+            isRestoringState = false
+            return
+        }
+
         // Phase 1: Load cached data immediately (synchronous, sub-100ms)
         loadFromCache()
-
         let hasCachedData = !plaidService.transactions.isEmpty
 
-        guard authService.isAuthenticated else {
-            benLog("ℹ️ User not authenticated, showing cached data only")
-            isRestoringState = false
-            return
-        }
-
-        guard authService.user?.uid != nil else {
-            benLog("⚠️ No user ID available for state restoration")
-            isRestoringState = false
-            return
-        }
+        // Stream transactions live from Firestore; they update as the server
+        // syncs them in (webhook-driven), so the UI fills in progressively.
+        plaidService.startTransactionsListener()
 
         // Phase 2: Silent network refresh
         // Only show loading indicator if there's no cached data to display
@@ -102,12 +129,14 @@ class AppDataManager: ObservableObject {
         let hasConnection = await plaidService.checkExistingConnection()
 
         if hasConnection {
-            await plaidService.fetchTransactions()
             // processPlaidAccounts() calls loadData() which processes utilizations,
             // matches benefits, calculates stats, and saves to cache — all in one pass.
             await processPlaidAccounts()
+            // Ask the server to pull the latest from Plaid; the listener surfaces
+            // new transactions as they land.
+            await plaidService.refreshTransactions()
 
-            benLog("✅ State restored: \(plaidService.transactions.count) transactions, \(userCards.count) cards")
+            benLog("✅ State restored: \(userCards.count) cards")
         } else {
             benLog("ℹ️ No existing connection to restore")
         }
@@ -237,12 +266,20 @@ class AppDataManager: ObservableObject {
         // Persist to local cache
         saveToCache()
 
+        // Notify for any newly auto-matched benefit credits.
+        await NotificationManager.shared.notifyNewlyMatchedBenefits(
+            utilizations: utilizationService.utilizations,
+            userCards: userCards,
+            transactions: transactions
+        )
+
         benLog("✅ Processed utilizations for \(userCards.count) cards")
     }
 
-    /// Refreshes all data from Plaid
+    /// Refreshes all data from Plaid (server-side sync; the live listener then
+    /// updates plaidService.transactions, which the UI observes).
     func refreshData() async {
-        await plaidService.fetchTransactions()
+        await plaidService.refreshTransactions()
         loadData(from: plaidService.transactions)
     }
 
@@ -510,11 +547,41 @@ class AppDataManager: ObservableObject {
         cardMatches = []
         subscriptions = []
         benefitMatches = []
+        recommendations = []
         needsCardConfirmation = false
+        // Stop the live listener and reset in-memory Plaid state.
+        plaidService.stopTransactionsListener()
+        plaidService.transactions = []
+        plaidService.accounts = []
+        plaidService.isLinked = false
+        plaidService.dataSource = .none
         cardMappingService.clearAllMappings()
         utilizationService.clearAllUtilizations()
         calculateStats()
         CacheManager.shared.clearAll()
+        clearGeneration += 1
+    }
+
+    /// Signs out and clears all local data first, so the UI empties instantly
+    /// rather than waiting on a reactive auth-state change to propagate.
+    func signOut() async {
+        await clearAllData()
+        do {
+            try authService.signOut()
+        } catch {
+            benLog("❌ Sign out error: \(error.localizedDescription)")
+        }
+    }
+
+    /// Permanently deletes the user's account. The server unlinks all Plaid
+    /// items, removes every Firestore record, and deletes the Firebase Auth
+    /// user (Admin SDK — no recent-login reauth needed). Locally we then wipe
+    /// state and end the session. Throws so the UI can surface failures.
+    func deleteAccount() async throws {
+        _ = try await Functions.functions().httpsCallable("deleteAccount").call()
+        await clearAllData()
+        try? authService.signOut()
+        benLog("✅ Account deleted")
     }
     
     // MARK: - Onboarding
@@ -532,13 +599,11 @@ class AppDataManager: ObservableObject {
     
     /// Handles successful Plaid connection
     func handlePlaidSuccess(publicToken: String) async {
-        // Exchange public token for access token
+        // Exchange public token for access token. exchangePublicToken also
+        // fetches accounts, starts the transactions listener, and triggers a
+        // server-side sync, so no explicit transaction fetch is needed here.
         await plaidService.exchangePublicToken(publicToken)
-        
-        // Fetch accounts and transactions
-        await plaidService.fetchAccounts()
-        await plaidService.fetchTransactions()
-        
+
         // Process the new data
         await restoreState()
     }

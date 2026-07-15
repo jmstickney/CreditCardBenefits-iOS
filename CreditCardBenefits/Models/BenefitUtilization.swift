@@ -186,19 +186,25 @@ struct BenefitPeriodHelper {
     /// - Monthly utilizations: include every month-period within the current year up to today.
     /// - Annual / cardmember-year / one-time utilizations: include the period that contains today.
     static func yearToDateUtilized(_ utilizations: [BenefitUtilization]) -> Double {
+        yearToDateRecords(utilizations).reduce(0.0) { $0 + $1.amountUtilized }
+    }
+
+    /// The subset of utilization records counting toward the current calendar
+    /// year — the same rule `yearToDateUtilized` sums over. Exposed so a
+    /// breakdown can show exactly which periods (and their matched
+    /// transactions) make up the year-to-date total.
+    static func yearToDateRecords(_ utilizations: [BenefitUtilization]) -> [BenefitUtilization] {
         let now = Date()
         let cal = Calendar.current
         let yearStart = cal.date(from: DateComponents(
             year: cal.component(.year, from: now), month: 1, day: 1
         )) ?? now
-        return utilizations.reduce(0.0) { sum, util in
+        return utilizations.filter { util in
             switch util.periodType {
             case .monthly:
-                guard util.periodStart >= yearStart && util.periodStart <= now else { return sum }
-                return sum + util.amountUtilized
+                return util.periodStart >= yearStart && util.periodStart <= now
             case .calendarYear, .cardmemberYear, .oneTime:
-                guard util.periodStart <= now && now <= util.periodEnd else { return sum }
-                return sum + util.amountUtilized
+                return util.periodStart <= now && now <= util.periodEnd
             }
         }
     }

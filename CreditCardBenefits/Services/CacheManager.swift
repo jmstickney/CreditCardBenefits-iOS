@@ -27,6 +27,9 @@ final class CacheManager {
         case isLinked
         case userCards
         case lastRefreshDate
+        // Transaction IDs we've already surfaced a "benefit matched" notification
+        // for (per user; cleared on sign-out). nil file == baseline not yet seeded.
+        case notifiedMatchIds
     }
 
     private init() {

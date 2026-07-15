@@ -4,8 +4,13 @@ import SwiftUI
 /// Shows all connected cards with utilization info
 struct CardsListView: View {
     @EnvironmentObject var dataManager: AppDataManager
-    @State private var showingAddCard = false
-    @State private var linkToken: String?
+    @State private var linkTokenItem: LinkTokenItem?
+    @State private var showSignIn = false
+
+    private struct LinkTokenItem: Identifiable {
+        let id = UUID()
+        let token: String
+    }
 
     var body: some View {
         ScrollView {
@@ -25,7 +30,8 @@ struct CardsListView: View {
 
                 // Card list
                 if dataManager.userCards.isEmpty {
-                    EmptyCardsView()
+                    EmptyAccountsView { startAddCard() }
+                        .padding(.horizontal, Ben.Spacing.screenH)
                 } else {
                     VStack(spacing: 0) {
                         ForEach(dataManager.userCards) { card in
@@ -57,6 +63,57 @@ struct CardsListView: View {
             }
         }
         .benBackground()
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    startAddCard()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundColor(Ben.Color.forest)
+                }
+            }
+        }
+        .authGate(isPresented: $showSignIn, dataManager: dataManager) {
+            Task { await handleAddCard() }
+        }
+        .sheet(item: $linkTokenItem) { item in
+            PlaidLinkView(
+                linkToken: item.token,
+                onSuccess: { publicToken in
+                    Task {
+                        await dataManager.plaidService.exchangePublicToken(publicToken)
+                        await dataManager.processPlaidAccounts()
+                        linkTokenItem = nil
+                    }
+                },
+                onExit: {
+                    linkTokenItem = nil
+                }
+            )
+        }
+    }
+
+    // MARK: - Add Card
+
+    /// Same gating as Home's "+": connect if signed in, otherwise prompt sign-in.
+    private func startAddCard() {
+        if dataManager.authService.isAuthenticated {
+            Task { await handleAddCard() }
+        } else {
+            showSignIn = true
+        }
+    }
+
+    @MainActor
+    private func handleAddCard() async {
+        do {
+            let token = try await dataManager.plaidService.createLinkToken()
+            linkTokenItem = LinkTokenItem(token: token)
+        } catch {
+            dataManager.error = .network(error.localizedDescription)
+            dataManager.showError = true
+        }
     }
 }
 
@@ -65,8 +122,12 @@ private struct CardListRow: View {
     let card: CreditCard
     let utilizations: [BenefitUtilization]
 
+    // Year-to-date, matching the card detail screen's "Benefits Captured"
+    // hero. A plain sum over `utilizations` counts every historical period
+    // (e.g. a monthly credit × many months), which doesn't reconcile with the
+    // detail view and makes the figure look like it comes from nowhere.
     private var totalUtilized: Double {
-        utilizations.reduce(0) { $0 + $1.amountUtilized }
+        BenefitPeriodHelper.yearToDateUtilized(utilizations)
     }
 
     private var unusedBenefits: Int {
@@ -124,29 +185,6 @@ private struct CardListRow: View {
         }
         .contentShape(Rectangle())
         .padding(Ben.Spacing.lg)
-    }
-}
-
-// MARK: - Empty State
-private struct EmptyCardsView: View {
-    var body: some View {
-        VStack(spacing: Ben.Spacing.md) {
-            Image(systemName: "creditcard")
-                .font(.system(size: 48))
-                .foregroundColor(Ben.Color.textMuted.opacity(0.3))
-
-            Text("No cards connected")
-                .font(Ben.Font.body)
-                .foregroundColor(Ben.Color.textBody)
-
-            Text("Connect your bank account to get started")
-                .font(Ben.Font.bodySmall)
-                .foregroundColor(Ben.Color.textMuted)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .benCard(padding: 40)
-        .padding(.horizontal, Ben.Spacing.screenH)
     }
 }
 

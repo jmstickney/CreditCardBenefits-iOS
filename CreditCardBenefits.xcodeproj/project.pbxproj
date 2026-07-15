@@ -7,10 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		811BF8172FE59CF50001871F /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 811BF8162FE59CF50001871F /* FirebaseAppCheck */; };
+		811BF81A2FEAB4E50001871F /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 811BF8192FEAB4E50001871F /* GoogleSignIn */; };
+		811BF81C2FEAB4E50001871F /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 811BF81B2FEAB4E50001871F /* GoogleSignInSwift */; };
 		812C5DB82EF2485F00E270B1 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 812C5DB72EF2485F00E270B1 /* LinkKit */; };
 		812C5DC42EF4AA6200E270B1 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 812C5DC32EF4AA6200E270B1 /* FirebaseCore */; };
 		812C5DC62EF4AA6C00E270B1 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 812C5DC52EF4AA6C00E270B1 /* FirebaseAuth */; };
 		812C5DC82EF4AA8700E270B1 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 812C5DC72EF4AA8700E270B1 /* FirebaseFunctions */; };
+		8169DCB73008074F00EDC362 /* CreditCardBenefits.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 8169DCB63008074F00EDC362 /* CreditCardBenefits.storekit */; };
 		81EAD0C02F368F3C002CD994 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 81EAD0BF2F368F3C002CD994 /* FirebaseFirestore */; };
 /* End PBXBuildFile section */
 
@@ -19,6 +23,7 @@
 		8153EBB42EE28D930001B9A5 /* CreditCardBenefits.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CreditCardBenefits.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8153EC092EE360CE0001B9A5 /* CreditCardBenefits.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = CreditCardBenefits.xcodeproj; sourceTree = "<group>"; };
 		8153EC372EE361890001B9A5 /* CreditCardBenefits.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = CreditCardBenefits.xcodeproj; sourceTree = "<group>"; };
+		8169DCB63008074F00EDC362 /* CreditCardBenefits.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = CreditCardBenefits.storekit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -50,8 +55,11 @@
 				812C5DC42EF4AA6200E270B1 /* FirebaseCore in Frameworks */,
 				812C5DC62EF4AA6C00E270B1 /* FirebaseAuth in Frameworks */,
 				812C5DB82EF2485F00E270B1 /* LinkKit in Frameworks */,
+				811BF81C2FEAB4E50001871F /* GoogleSignInSwift in Frameworks */,
 				81EAD0C02F368F3C002CD994 /* FirebaseFirestore in Frameworks */,
+				811BF8172FE59CF50001871F /* FirebaseAppCheck in Frameworks */,
 				812C5DC82EF4AA8700E270B1 /* FirebaseFunctions in Frameworks */,
+				811BF81A2FEAB4E50001871F /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,6 +83,7 @@
 		8153EBAB2EE28D930001B9A5 = {
 			isa = PBXGroup;
 			children = (
+				8169DCB63008074F00EDC362 /* CreditCardBenefits.storekit */,
 				8153EBB62EE28D930001B9A5 /* CreditCardBenefits */,
 				812C5DC22EF4AA6200E270B1 /* Frameworks */,
 				8153EBB52EE28D930001B9A5 /* Products */,
@@ -126,6 +135,9 @@
 				812C5DC52EF4AA6C00E270B1 /* FirebaseAuth */,
 				812C5DC72EF4AA8700E270B1 /* FirebaseFunctions */,
 				81EAD0BF2F368F3C002CD994 /* FirebaseFirestore */,
+				811BF8162FE59CF50001871F /* FirebaseAppCheck */,
+				811BF8192FEAB4E50001871F /* GoogleSignIn */,
+				811BF81B2FEAB4E50001871F /* GoogleSignInSwift */,
 			);
 			productName = CreditCardBenefits;
 			productReference = 8153EBB42EE28D930001B9A5 /* CreditCardBenefits.app */;
@@ -158,6 +170,7 @@
 			packageReferences = (
 				812C5DB62EF2485F00E270B1 /* XCRemoteSwiftPackageReference "plaid-link-ios" */,
 				812C5DBB2EF3A67900E270B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				811BF8182FEAB4E50001871F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8153EBB52EE28D930001B9A5 /* Products */;
@@ -188,6 +201,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8169DCB73008074F00EDC362 /* CreditCardBenefits.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -257,7 +271,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -315,7 +329,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -330,6 +344,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CreditCardBenefits/CreditCardBenefits.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = H87AHG4SAH;
@@ -346,7 +361,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jstick.CreditCardBenefits;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -364,6 +379,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CreditCardBenefits/CreditCardBenefits.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = H87AHG4SAH;
@@ -380,7 +396,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jstick.CreditCardBenefits;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -417,6 +433,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		811BF8182FEAB4E50001871F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.2.0;
+			};
+		};
 		812C5DB62EF2485F00E270B1 /* XCRemoteSwiftPackageReference "plaid-link-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/plaid/plaid-link-ios";
@@ -436,6 +460,21 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		811BF8162FE59CF50001871F /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 812C5DBB2EF3A67900E270B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
+		};
+		811BF8192FEAB4E50001871F /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 811BF8182FEAB4E50001871F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		811BF81B2FEAB4E50001871F /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 811BF8182FEAB4E50001871F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
 		812C5DB72EF2485F00E270B1 /* LinkKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 812C5DB62EF2485F00E270B1 /* XCRemoteSwiftPackageReference "plaid-link-ios" */;

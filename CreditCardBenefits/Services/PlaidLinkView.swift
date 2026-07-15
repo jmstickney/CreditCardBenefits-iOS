@@ -31,6 +31,7 @@ class PlaidLinkViewController: UIViewController {
     private let onSuccess: (String) -> Void
     private let onExit: () -> Void
     private var linkHandler: Handler?
+    private let spinner = UIActivityIndicatorView(style: .large)
 
     init(linkToken: String, onSuccess: @escaping (String) -> Void, onExit: @escaping () -> Void) {
         self.linkToken = linkToken
@@ -48,18 +49,42 @@ class PlaidLinkViewController: UIViewController {
         super.viewDidLoad()
         benLog("🔗 PlaidLinkViewController viewDidLoad")
         view.backgroundColor = .systemBackground
+
+        // Show a spinner so this sheet is never a blank white screen while
+        // Plaid Link initializes and loads its UI.
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        spinner.startAnimating()
+        view.addSubview(spinner)
+        NSLayoutConstraint.activate([
+            spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
     }
 
     override func viewDidAppear(_ animated: Bool) {
         benLog("🔗 PlaidLinkViewController viewDidAppear")
         super.viewDidAppear(animated)
 
-        // Only present once
+        // Only present once.
         guard linkHandler == nil else { return }
 
+        // Present Plaid Link only AFTER the enclosing sheet's presentation
+        // transition finishes. Calling present() while that transition is still
+        // running makes UIKit silently drop the Plaid Link modal, leaving a
+        // blank white sheet indefinitely.
+        if let coordinator = transitionCoordinator {
+            coordinator.animate(alongsideTransition: nil) { [weak self] _ in
+                self?.openPlaidLink()
+            }
+        } else {
+            openPlaidLink()
+        }
+    }
+
+    private func openPlaidLink() {
+        guard linkHandler == nil else { return }
         benLog("🔗 Creating Plaid Link")
 
-        // Create Link configuration
         var linkConfiguration = LinkTokenConfiguration(
             token: linkToken
         ) { [weak self] success in
@@ -76,7 +101,6 @@ class PlaidLinkViewController: UIViewController {
             self?.onExit()
         }
 
-        // Create and open Plaid Link
         benLog("🔗 Calling Plaid.create()...")
         let result = Plaid.create(linkConfiguration)
         switch result {
@@ -85,8 +109,7 @@ class PlaidLinkViewController: UIViewController {
             self.linkHandler = handler
             handler.open(presentUsing: .viewController(self))
         case .failure(let error):
-            benLog("❌ Plaid Link creation failed: \(error)")
-            benLog("❌ Error details: \(error.localizedDescription)")
+            benLog("❌ Plaid Link creation failed: \(error.localizedDescription)")
             onExit()
         }
     }

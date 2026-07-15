@@ -176,12 +176,19 @@ class BenefitUtilizationService: ObservableObject {
             // Check date range
             guard dateRange.contains(transaction.date) else { return false }
             
-            // Filter by transaction type (credit vs purchase)
-            // Benefits that match credits (statement credits) should accept both credit
-            // and debit transactions, since issuers like Amex often report statement
-            // credits as positive amounts in Plaid. The merchant name is specific enough
-            // to avoid false positives. For purchase-matching benefits, only match purchases.
-            if !benefit.matchCreditTransactions && transaction.isCredit {
+            // Filter by transaction type (credit vs purchase).
+            //
+            // A statement-credit benefit (matchCreditTransactions) is only
+            // actually "used" when the issuer posts the reimbursement, which
+            // Plaid reports as a credit/inflow (isCredit == true). A normal
+            // purchase at the same merchant is a debit and must NOT count —
+            // counting purchases was silently inflating utilization (e.g. an
+            // ordinary Walmart or Disney+ purchase being booked against the
+            // Walmart+ / Digital Entertainment credit). Purchase-matching
+            // benefits, conversely, only count purchases — never credits/refunds.
+            if benefit.matchCreditTransactions {
+                if !transaction.isCredit { return false }
+            } else if transaction.isCredit {
                 return false
             }
 

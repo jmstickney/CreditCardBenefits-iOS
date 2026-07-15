@@ -1,0 +1,63 @@
+{
+  "identifier" : "8F1C2A34-0000-4000-9000-BEN0STOREKIT",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "",
+    "_developerTeamID" : "H87AHG4SAH",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21700001",
+      "localizations" : [
+
+      ],
+      "name" : "Ben Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6F1C2A34-0001-4000-9000-BEN0MONTHLY0",
+          "introductoryOffer" : {
+            "internalID" : "6F1C2A34-0002-4000-9000-BEN0INTRO000",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
+          "localizations" : [
+            {
+              "description" : "All Ben features, 7 days free",
+              "displayName" : "Ben Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.jstick.CreditCardBenefits.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Ben Monthly",
+          "subscriptionGroupID" : "21700001",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

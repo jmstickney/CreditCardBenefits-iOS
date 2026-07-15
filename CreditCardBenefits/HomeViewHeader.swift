@@ -10,6 +10,8 @@ struct HomeHeaderView: View {
     let totalFees: Double        // e.g. 1340.0
     let cardCount: Int           // e.g. 3
     let unusedBenefitCount: Int  // e.g. 23
+    /// Optional: makes the "Benefits Captured" hero tappable (breakdown drill-in).
+    var onHeroTap: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: Ben.Spacing.md) {
@@ -17,7 +19,8 @@ struct HomeHeaderView: View {
             BenefitProgressHeroCard(
                 label: "Benefits Captured",
                 usedValue: usedValue,
-                totalFees: totalFees
+                totalFees: totalFees,
+                onTap: onHeroTap
             )
             quickStats
         }
@@ -60,6 +63,8 @@ struct BenefitProgressHeroCard: View {
     let label: String
     let usedValue: Double
     let totalFees: Double
+    /// When set, the card becomes tappable (shows a chevron) and runs this on tap.
+    var onTap: (() -> Void)? = nil
 
     private var progress: Double {
         guard totalFees > 0 else { return 0 }
@@ -75,15 +80,33 @@ struct BenefitProgressHeroCard: View {
     }
 
     var body: some View {
+        if let onTap {
+            Button(action: onTap) { cardBody }
+                .buttonStyle(PlainButtonStyle())
+        } else {
+            cardBody
+        }
+    }
+
+    private var cardBody: some View {
         VStack(alignment: .leading, spacing: 0) {
 
-            // Label
-            Text(label)
-                .font(Ben.Font.tag)
-                .tracking(1.0)
-                .textCase(.uppercase)
-                .foregroundColor(Ben.Color.textMuted)
-                .padding(.bottom, Ben.Spacing.xs)
+            // Label (+ chevron affordance when tappable)
+            HStack(spacing: Ben.Spacing.xs) {
+                Text(label)
+                    .font(Ben.Font.tag)
+                    .tracking(1.0)
+                    .textCase(.uppercase)
+                    .foregroundColor(Ben.Color.textMuted)
+
+                if onTap != nil {
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Ben.Color.textMuted)
+                }
+            }
+            .padding(.bottom, Ben.Spacing.xs)
 
             // Big number
             Text(usedValue, format: .currency(code: "USD").precision(.fractionLength(0)))
