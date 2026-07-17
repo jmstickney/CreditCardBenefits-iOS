@@ -49,6 +49,11 @@ struct CreditCardBenefit: Identifiable, Codable {
     let amount: Double
     let frequency: BenefitFrequency
     let eligibleMerchants: [String]?
+    // AND-groups: each inner array is a set of tokens that must ALL appear in
+    // the transaction merchant string (e.g. [["uber", "one"]] matches
+    // "UBER *ONE MEMBERSHIP" but not "UBER TRIP"). Used when single substrings
+    // are too broad.
+    let eligibleMerchantsAllOf: [[String]]?
     let category: String?
     let conditions: String?
 
@@ -135,6 +140,7 @@ struct CreditCardBenefit: Identifiable, Codable {
         amount: Double,
         frequency: BenefitFrequency,
         eligibleMerchants: [String]? = nil,
+        eligibleMerchantsAllOf: [[String]]? = nil,
         category: String? = nil,
         conditions: String? = nil,
         period: BenefitPeriod = .monthly,
@@ -152,6 +158,7 @@ struct CreditCardBenefit: Identifiable, Codable {
         self.amount = amount
         self.frequency = frequency
         self.eligibleMerchants = eligibleMerchants
+        self.eligibleMerchantsAllOf = eligibleMerchantsAllOf
         self.category = category
         self.conditions = conditions
         self.period = period
@@ -167,7 +174,7 @@ struct CreditCardBenefit: Identifiable, Codable {
 
     enum CodingKeys: String, CodingKey {
         case id, type, name, description, amount, frequency
-        case eligibleMerchants, category, conditions
+        case eligibleMerchants, eligibleMerchantsAllOf, category, conditions
         case period, monthlyAmounts, eligibleCategories
         case canAutoDetect, requiresEnrollment, enrollmentUrl
         case matchCreditTransactions
@@ -182,6 +189,7 @@ struct CreditCardBenefit: Identifiable, Codable {
         amount = try container.decode(Double.self, forKey: .amount)
         frequency = try container.decode(BenefitFrequency.self, forKey: .frequency)
         eligibleMerchants = try container.decodeIfPresent([String].self, forKey: .eligibleMerchants)
+        eligibleMerchantsAllOf = try container.decodeIfPresent([[String]].self, forKey: .eligibleMerchantsAllOf)
         category = try container.decodeIfPresent(String.self, forKey: .category)
         conditions = try container.decodeIfPresent(String.self, forKey: .conditions)
 

@@ -196,10 +196,18 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     /// Settings toggle. Bound via @AppStorage in SettingsView; read here.
     static let benefitMatchNotificationsKey = "notifyOnBenefitMatch"
 
+    /// UserDefaults key backing the "wrong-card alerts" Settings toggle.
+    static let missedBenefitNotificationsKey = "notifyOnMissedBenefit"
+
     /// Whether the user wants benefit auto-match notifications. Defaults ON when
     /// they haven't set a preference.
     private var benefitMatchNotificationsEnabled: Bool {
         UserDefaults.standard.object(forKey: Self.benefitMatchNotificationsKey) as? Bool ?? true
+    }
+
+    /// Whether the user wants wrong-card alerts. Defaults ON.
+    private var missedBenefitNotificationsEnabled: Bool {
+        UserDefaults.standard.object(forKey: Self.missedBenefitNotificationsKey) as? Bool ?? true
     }
 
     /// Fires a local notification when Ben auto-detects that a benefit credit was
@@ -308,6 +316,106 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
 
         benLog("🔔 Fired benefit-match notifications: \(events.count)")
+    }
+
+    // MARK: - Wrong-Card (Missed Benefit) Alerts
+
+    /// Alerts when spend is detected on a card that doesn't carry a benefit
+    /// another connected card does. First run sends ONE summary for whatever
+    /// already exists in history; afterwards only newly detected purchases
+    /// (≤14 days old) alert. De-dupes via a persisted set of transaction ids.
+    func notifyMissedBenefits(_ opportunities: [MissedBenefitOpportunity]) async {
+        let currentIds = Set(
+            opportunities.flatMap { $0.matchedTransactions.map(\.id) }
+        )
+
+        let seenList = CacheManager.shared.load(
+            [String].self, for: .notifiedOpportunityTxnIds
+        )
+        let seen = Set(seenList ?? [])
+        let persistSeen = {
+            CacheManager.shared.save(
+                Array(seen.union(currentIds)), for: .notifiedOpportunityTxnIds
+            )
+        }
+
+        guard missedBenefitNotificationsEnabled, await isAuthorized() else {
+            // Mark as seen so re-enabling doesn't dump a backlog of alerts.
+            persistSeen()
+            return
+        }
+
+        // First run: one summary covering the existing backlog (user opted in
+        // to hearing about current misses once), then new-only.
+        guard seenList != nil else {
+            if !opportunities.isEmpty {
+                let content = UNMutableNotificationContent()
+                content.title = "You may be using the wrong card 💳"
+                content.body = opportunities.count == 1
+                    ? singleOpportunityBody(opportunities[0])
+                    : "Ben found \(opportunities.count) purchases that a different card's benefits could cover. Check Savings Opportunities."
+                content.sound = .default
+                let request = UNNotificationRequest(
+                    identifier: "missed-baseline",
+                    content: content,
+                    trigger: nil
+                )
+                try? await center.add(request)
+                benLog("🔔 Missed-benefit baseline alert (\(opportunities.count))")
+            }
+            persistSeen()
+            return
+        }
+
+        // Only opportunities with a NEW, recent transaction alert.
+        let recentCutoff = Calendar.current.date(
+            byAdding: .day, value: -Self.matchRecencyDays, to: Date()
+        ) ?? .distantPast
+        let newOpportunities = opportunities.filter { opp in
+            opp.matchedTransactions.contains {
+                !seen.contains($0.id) && $0.date >= recentCutoff
+            }
+        }
+        guard !newOpportunities.isEmpty else {
+            if !currentIds.subtracting(seen).isEmpty { persistSeen() }
+            return
+        }
+
+        if newOpportunities.count <= 3 {
+            for opp in newOpportunities {
+                let content = UNMutableNotificationContent()
+                content.title = "Wrong card for \(opp.merchantDisplayName)?"
+                content.body = singleOpportunityBody(opp)
+                content.sound = .default
+                let request = UNNotificationRequest(
+                    identifier: "missed-\(opp.key)-\(Int(opp.latestDate.timeIntervalSince1970))",
+                    content: content,
+                    trigger: nil
+                )
+                try? await center.add(request)
+            }
+        } else {
+            let content = UNMutableNotificationContent()
+            content.title = "You may be using the wrong card 💳"
+            content.body = "Ben found \(newOpportunities.count) recent purchases that a different card's benefits could cover. Check Savings Opportunities."
+            content.sound = .default
+            let request = UNNotificationRequest(
+                identifier: "missed-summary-\(Int(Date().timeIntervalSince1970))",
+                content: content,
+                trigger: nil
+            )
+            try? await center.add(request)
+        }
+
+        benLog("🔔 Missed-benefit alerts: \(newOpportunities.count)")
+        persistSeen()
+    }
+
+    private func singleOpportunityBody(_ opp: MissedBenefitOpportunity) -> String {
+        let paidOn = opp.paidCardNames.first ?? "another card"
+        return "You paid \(opp.merchantDisplayName) with \(paidOn) — "
+            + "your \(opp.coveringCard.name)'s \(opp.benefit.name) "
+            + "(worth up to \(opp.benefit.annualAmount.asCurrency())/yr) could cover it."
     }
 
     // MARK: - Cancel All

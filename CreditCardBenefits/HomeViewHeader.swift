@@ -8,10 +8,11 @@ struct HomeHeaderView: View {
     // Pass these in from your existing HomeView state/viewmodel
     let usedValue: Double        // e.g. 23.0
     let totalFees: Double        // e.g. 1340.0
-    let cardCount: Int           // e.g. 3
-    let unusedBenefitCount: Int  // e.g. 23
     /// Optional: makes the "Benefits Captured" hero tappable (breakdown drill-in).
     var onHeroTap: (() -> Void)? = nil
+
+    // NOTE: the quick-stat chips (cards / unused benefits) moved to the bottom
+    // of HomeView so Savings Opportunities can sit directly under the hero.
 
     var body: some View {
         VStack(alignment: .leading, spacing: Ben.Spacing.md) {
@@ -22,7 +23,6 @@ struct HomeHeaderView: View {
                 totalFees: totalFees,
                 onTap: onHeroTap
             )
-            quickStats
         }
         .padding(.horizontal, Ben.Spacing.screenH)
         .padding(.top, Ben.Spacing.lg)
@@ -36,22 +36,6 @@ struct HomeHeaderView: View {
             .tracking(0.8)
             .textCase(.uppercase)
             .foregroundColor(Ben.Color.textMuted)
-    }
-
-    // MARK: - Quick stat chips below the hero card
-    private var quickStats: some View {
-        HStack(spacing: Ben.Spacing.sm) {
-            QuickStatChip(
-                label: "cards",
-                value: "\(cardCount)",
-                valueColor: Ben.Color.textPrimary
-            )
-            QuickStatChip(
-                label: "unused benefits",
-                value: "\(unusedBenefitCount)",
-                valueColor: unusedBenefitCount > 0 ? Ben.Color.warn : Ben.Color.mintDark
-            )
-        }
     }
 }
 
@@ -190,9 +174,7 @@ struct QuickStatChip: View {
         VStack(alignment: .leading, spacing: 0) {
             HomeHeaderView(
                 usedValue: 23,
-                totalFees: 1340,
-                cardCount: 3,
-                unusedBenefitCount: 23
+                totalFees: 1340
             )
 
             // Simulate the Accounts section below

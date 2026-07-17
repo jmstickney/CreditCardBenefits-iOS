@@ -166,9 +166,11 @@ struct CardPickerView: View {
             .filter { !$0.cards.isEmpty }  // Only show issuers with available cards
     }
     
-    // Check if the selected card has any cardmemberYear benefits
+    // Whether to prompt for a card anniversary. Amex resets its annual credits
+    // on the calendar year, so it never needs one — only cards with true
+    // cardmember-year benefits (e.g. Chase) do.
     private func needsAnniversaryDate(for card: CreditCard) -> Bool {
-        card.benefits.contains { $0.period == .cardmemberYear }
+        card.issuer != .amex && card.benefits.contains { $0.period == .cardmemberYear }
     }
 
     var body: some View {

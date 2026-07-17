@@ -20,6 +20,15 @@ class PlaidService: ObservableObject {
     @Published var transactions: [Transaction] = []
     @Published var accounts: [PlaidAccount] = []
     @Published var dataSource: DataSource = .none
+    /// Per-item connection status (which banks need re-authentication).
+    @Published var itemStatuses: [PlaidItemStatus] = []
+
+    /// Items whose bank login expired and need the user to reconnect.
+    var itemsNeedingReconnect: [PlaidItemStatus] {
+        itemStatuses.filter { $0.needsReconnect }
+    }
+
+    var needsReconnect: Bool { !itemsNeedingReconnect.isEmpty }
 
     private let functions = Functions.functions()
     private let db = Firestore.firestore()
@@ -263,12 +272,23 @@ class PlaidService: ObservableObject {
 
     /// Disconnects the bank account and clears local data
     func disconnect() async {
+        // Remove the items at Plaid + delete their stored data so nothing is
+        // left orphaned server-side (which previously caused duplicate
+        // connections on reconnect). Best-effort: clear locally regardless.
+        do {
+            _ = try await functions.httpsCallable("disconnectAllBanks").call()
+            benLog("✅ Bank disconnected server-side")
+        } catch {
+            benLog("⚠️ Server disconnect failed, clearing locally anyway: \(error.localizedDescription)")
+        }
+
         stopTransactionsListener()
         await MainActor.run {
             self.isLinked = false
             self.dataSource = .none
             self.transactions = []
             self.accounts = []
+            self.itemStatuses = []
         }
         benLog("✅ Bank disconnected locally")
     }
@@ -389,6 +409,47 @@ class PlaidService: ObservableObject {
         }
     }
 
+    // MARK: - Reconnect (Plaid update mode)
+
+    /// Fetches each item's connection status so the UI can prompt a reconnect
+    /// when a bank login has expired. Never touches access tokens.
+    func fetchItemsStatus() async {
+        do {
+            let result = try await functions.httpsCallable("getItemsStatus").call()
+            guard let data = result.data as? [String: Any],
+                  let items = data["items"] as? [[String: Any]] else { return }
+            let parsed = items.compactMap { dict -> PlaidItemStatus? in
+                guard let itemId = dict["itemId"] as? String else { return nil }
+                let ms = (dict["lastSyncedAt"] as? NSNumber)?.doubleValue
+                return PlaidItemStatus(
+                    itemId: itemId,
+                    needsReconnect: dict["needsReconnect"] as? Bool ?? false,
+                    errorCode: dict["errorCode"] as? String,
+                    lastSyncedAt: ms.map { Date(timeIntervalSince1970: $0 / 1000) }
+                )
+            }
+            await MainActor.run { self.itemStatuses = parsed }
+            benLog("✅ Item statuses: \(parsed.count), reconnect needed: \(parsed.filter { $0.needsReconnect }.count)")
+        } catch {
+            benLog("❌ getItemsStatus error: \(error.localizedDescription)")
+        }
+    }
+
+    /// Creates a Plaid Link token in update mode for an existing item, so the
+    /// user can re-authenticate without re-adding the card. In update mode the
+    /// Link success does NOT produce a token to exchange — the item is fixed in
+    /// place, so callers just refresh afterward.
+    func createUpdateLinkToken(itemId: String) async throws -> String {
+        let result = try await functions
+            .httpsCallable("createUpdateLinkToken")
+            .call(["itemId": itemId])
+        guard let data = result.data as? [String: Any],
+              let token = data["link_token"] as? String else {
+            throw PlaidError.invalidResponse
+        }
+        return token
+    }
+
     // MARK: - Helper Methods
 
     private func parseTransactions(_ data: [[String: Any]]) -> [Transaction] {
@@ -499,6 +560,17 @@ enum DataSource: String, Codable {
             return "green"
         }
     }
+}
+
+// MARK: - Plaid Item Status
+
+struct PlaidItemStatus: Identifiable, Equatable {
+    let itemId: String
+    let needsReconnect: Bool
+    let errorCode: String?
+    let lastSyncedAt: Date?
+
+    var id: String { itemId }
 }
 
 // MARK: - Plaid Account

@@ -24,6 +24,16 @@ struct BenOnboardingView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(.easeInOut(duration: 0.35), value: currentPage)
+            // Onboarding is one-time: once the user reaches the paywall page
+            // they've seen the pitch. Persist directly to UserDefaults (NOT the
+            // published flag) so this session stays in onboarding and can
+            // purchase, while the next launch goes straight to the app — where
+            // the subscription gate enforces the paywall for non-subscribers.
+            .onChange(of: currentPage) { _, page in
+                if page == 4 {
+                    UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+                }
+            }
 
             VStack {
                 Spacer()
@@ -341,7 +351,6 @@ struct PaywallScreen: View {
         "Benefits tracker for all your cards",
         "Monthly reset alerts before credits expire",
         "Annual fee ROI scorecard",
-        "\"Best card for this purchase\" suggestions",
         "New benefit & enrollment notifications",
     ]
 

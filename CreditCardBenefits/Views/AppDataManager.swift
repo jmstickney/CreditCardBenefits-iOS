@@ -26,6 +26,8 @@ class AppDataManager: ObservableObject {
     @Published var subscriptions: [Subscription] = []
     @Published var benefitMatches: [BenefitMatch] = []
     @Published var recommendations: [Recommendation] = []
+    // Wrong-card suggestions: spend that another connected card's benefit covers.
+    @Published var missedOpportunities: [MissedBenefitOpportunity] = []
     @Published var stats: UserStats
 
     // Card Selection State
@@ -135,6 +137,9 @@ class AppDataManager: ObservableObject {
             // Ask the server to pull the latest from Plaid; the listener surfaces
             // new transactions as they land.
             await plaidService.refreshTransactions()
+
+            // Check whether any bank connection has expired (needs reconnect).
+            await plaidService.fetchItemsStatus()
 
             benLog("✅ State restored: \(userCards.count) cards")
         } else {
@@ -273,7 +278,42 @@ class AppDataManager: ObservableObject {
             transactions: transactions
         )
 
+        // Detect wrong-card spend (a different card's benefit covers it).
+        refreshMissedOpportunities(transactions: transactions)
+        await NotificationManager.shared.notifyMissedBenefits(missedOpportunities)
+
         benLog("✅ Processed utilizations for \(userCards.count) cards")
+    }
+
+    // MARK: - Missed Benefit Opportunities
+
+    /// Recomputes wrong-card suggestions from the given transactions.
+    func refreshMissedOpportunities(transactions: [Transaction]) {
+        let dismissed = Set(
+            CacheManager.shared.load([String].self, for: .dismissedOpportunities) ?? []
+        )
+        missedOpportunities = MissedBenefitDetector.detect(
+            transactions: transactions,
+            userCards: userCards,
+            cardMatches: cardMatches,
+            utilizations: utilizationService.utilizations,
+            dismissedKeys: dismissed
+        )
+        if !missedOpportunities.isEmpty {
+            benLog("💡 Missed-benefit opportunities: \(missedOpportunities.count)")
+        }
+    }
+
+    /// Permanently hides a wrong-card suggestion (per benefit + merchant).
+    func dismissOpportunity(_ opportunity: MissedBenefitOpportunity) {
+        var dismissed = CacheManager.shared.load(
+            [String].self, for: .dismissedOpportunities
+        ) ?? []
+        if !dismissed.contains(opportunity.key) {
+            dismissed.append(opportunity.key)
+            CacheManager.shared.save(dismissed, for: .dismissedOpportunities)
+        }
+        missedOpportunities.removeAll { $0.key == opportunity.key }
     }
 
     /// Refreshes all data from Plaid (server-side sync; the live listener then
@@ -548,11 +588,13 @@ class AppDataManager: ObservableObject {
         subscriptions = []
         benefitMatches = []
         recommendations = []
+        missedOpportunities = []
         needsCardConfirmation = false
         // Stop the live listener and reset in-memory Plaid state.
         plaidService.stopTransactionsListener()
         plaidService.transactions = []
         plaidService.accounts = []
+        plaidService.itemStatuses = []
         plaidService.isLinked = false
         plaidService.dataSource = .none
         cardMappingService.clearAllMappings()

@@ -197,11 +197,24 @@ class BenefitUtilizationService: ObservableObject {
             // transaction merchant. The reverse direction (eligible.contains(merchant))
             // caused false positives, e.g. eligible "STUBHUB CREDIT $300/YEAR" matching
             // a regular "STUBHUB" merchant purchase.
+            let merchantNames = [transaction.merchant.lowercased()] + (transaction.merchantName.map { [$0.lowercased()] } ?? [])
+
             if let merchants = benefit.eligibleMerchants {
-                let merchantNames = [transaction.merchant.lowercased()] + (transaction.merchantName.map { [$0.lowercased()] } ?? [])
                 for normalizedMerchant in merchantNames {
                     if merchants.contains(where: { eligible in
                         normalizedMerchant.contains(eligible.lowercased())
+                    }) {
+                        return true
+                    }
+                }
+            }
+
+            // Strategy 1b: AND-groups — every token in a group must appear
+            // (e.g. ["uber","one"] matches "UBER *ONE MEMBERSHIP", not "UBER TRIP").
+            if let allOfGroups = benefit.eligibleMerchantsAllOf {
+                for normalizedMerchant in merchantNames {
+                    if allOfGroups.contains(where: { group in
+                        group.allSatisfy { normalizedMerchant.contains($0.lowercased()) }
                     }) {
                         return true
                     }

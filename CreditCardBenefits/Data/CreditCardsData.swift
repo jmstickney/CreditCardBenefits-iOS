@@ -172,7 +172,7 @@ struct CreditCardsData {
                     eligibleMerchants: nil,
                     category: "travel",
                     conditions: "Must select one airline. Covers bags, seat selection, in-flight purchases.",
-                    period: .cardmemberYear,
+                    period: .calendarYear,  // Amex resets annual credits on the calendar year
                     canAutoDetect: false,  // Applied as statement credit
                     requiresEnrollment: true,
                     enrollmentUrl: "https://global.americanexpress.com/card-benefits/detail/airline-fee-credit"
@@ -184,10 +184,15 @@ struct CreditCardsData {
                     description: "$209/year for CLEAR Plus membership",
                     amount: 209,
                     frequency: .annual,
-                    eligibleMerchants: ["CLEAR", "Clear"],
+                    // Specific descriptors only — a bare "CLEAR" substring
+                    // false-matched merchants like "Clearwater Beach Florida".
+                    eligibleMerchants: [
+                        "CLEARME", "CLEAR *", "CLEAR SECURE",
+                        "CLEAR PLUS", "CLEAR.ME"
+                    ],
                     category: "travel",
                     conditions: "CLEAR Plus annual membership",
-                    period: .cardmemberYear,
+                    period: .calendarYear,  // Amex resets annual credits on the calendar year
                     canAutoDetect: true,
                     requiresEnrollment: false,
                     matchCreditTransactions: true
@@ -240,10 +245,16 @@ struct CreditCardsData {
                         "UBER ONE", "AMEX UBER ONE",
                         "Uber One", "UBERONE"
                     ],
+                    // Handles starred descriptors like "UBER *ONE MEMBERSHIP"
+                    // (both tokens required, so plain rides/eats never match).
+                    eligibleMerchantsAllOf: [["uber", "one"]],
                     category: "rideshare",
                     conditions: "Annual Uber One membership",
                     period: .calendarYear,
-                    canAutoDetect: false,  // Credits added to Uber app
+                    // Auto-detect from the membership CHARGE (e.g. +$96) on this
+                    // card. matchCreditTransactions stays false so credits/refunds
+                    // (e.g. a -$44 Uber refund) are never counted as usage.
+                    canAutoDetect: true,
                     requiresEnrollment: false
                 )
             ],

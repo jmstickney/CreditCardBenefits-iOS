@@ -16,6 +16,7 @@ struct CardDetailView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var showingAnniversaryPicker = false
     @State private var showingCapturedBreakdown = false
+    @State private var showConfetti = false
 
     private var utilizations: [BenefitUtilization] {
         dataManager.utilizationService.utilizationsForCard(card.id)
@@ -33,6 +34,19 @@ struct CardDetailView: View {
     
     private var hasCardmemberYearBenefits: Bool {
         card.benefits.contains { $0.period == .cardmemberYear }
+    }
+
+    /// Whether to offer the card-anniversary setting. Amex resets its annual
+    /// credits on the calendar year (no anniversary needed), so it's hidden for
+    /// Amex regardless of how individual benefits are modeled.
+    private var showsAnniversarySetting: Bool {
+        hasCardmemberYearBenefits && card.issuer != .amex
+    }
+
+    /// Name of the benefit that resets on the anniversary (Chase's travel
+    /// credit), used in the anniversary prompt copy.
+    private var anniversaryBenefitName: String {
+        card.benefits.first { $0.period == .cardmemberYear }?.name ?? "annual credit"
     }
 
     var body: some View {
@@ -81,47 +95,83 @@ struct CardDetailView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 24)
                     
-                    // Anniversary Date Section (only if card has cardmemberYear benefits)
-                    if hasCardmemberYearBenefits {
-                        VStack(spacing: 16) {
-                            HStack {
-                                Text("Card Anniversary")
-                                    .font(Ben.Font.bodySmall)
-                                    .foregroundColor(Ben.Color.textMuted)
-                                
-                                Spacer()
-                                
-                                Button {
-                                    showingAnniversaryPicker = true
-                                } label: {
-                                    Text(cardMatch?.anniversaryDate != nil ? "Edit" : "Set Date")
-                                        .font(Ben.Font.body)
-                                        .foregroundColor(Ben.Color.forest)
+                    // Anniversary Date Section — only for cards with a
+                    // cardmember-year benefit (e.g. Chase's travel credit).
+                    if showsAnniversarySetting {
+                        if let anniversaryDate = cardMatch?.anniversaryDate {
+                            // Set: compact display with an Edit action.
+                            VStack(spacing: 16) {
+                                HStack {
+                                    Text("Card Anniversary")
+                                        .font(Ben.Font.bodySmall)
+                                        .foregroundColor(Ben.Color.textMuted)
+
+                                    Spacer()
+
+                                    Button {
+                                        showingAnniversaryPicker = true
+                                    } label: {
+                                        Text("Edit")
+                                            .font(Ben.Font.body)
+                                            .foregroundColor(Ben.Color.forest)
+                                    }
                                 }
-                            }
-                            
-                            HStack {
-                                if let anniversaryDate = cardMatch?.anniversaryDate {
+
+                                HStack {
                                     Text(AnniversaryDateHelper.displayString(for: anniversaryDate))
                                         .font(.system(size: 17, weight: .semibold))
                                         .foregroundColor(Ben.Color.textPrimary)
-                                } else {
-                                    Text("Not set")
-                                        .font(.system(size: 17, weight: .semibold))
-                                        .foregroundColor(Ben.Color.warn)
+                                    Spacer()
                                 }
-                                
-                                Spacer()
+
+                                Text("Your \(anniversaryBenefitName) resets on this date each year.")
+                                    .font(Ben.Font.caption)
+                                    .foregroundColor(Ben.Color.textMuted)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            
-                            Text("Used to track annual benefits that reset on your account anniversary")
-                                .font(Ben.Font.caption)
-                                .foregroundColor(Ben.Color.textMuted)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            .benCard()
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 24)
+                        } else {
+                            // Unset: prominent nudge. Without an anniversary the
+                            // travel credit falls back to calendar-year tracking,
+                            // so make setting it easy to notice.
+                            Button {
+                                showingAnniversaryPicker = true
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "calendar.badge.exclamationmark")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(Ben.Color.warn)
+
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text("Set your card anniversary")
+                                            .font(Ben.Font.body)
+                                            .foregroundColor(Ben.Color.textPrimary)
+                                        Text("Your \(anniversaryBenefitName) resets on your account anniversary — set it so Ben tracks it on the right dates.")
+                                            .font(Ben.Font.caption)
+                                            .foregroundColor(Ben.Color.textMuted)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+
+                                    Spacer(minLength: 8)
+
+                                    Text("Set")
+                                        .font(Ben.Font.body)
+                                        .foregroundColor(Ben.Color.forest)
+                                }
+                                .padding(Ben.Spacing.lg)
+                                .background(Ben.Color.warn.opacity(0.10))
+                                .cornerRadius(Ben.Radius.lg)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Ben.Radius.lg)
+                                        .stroke(Ben.Color.warn.opacity(0.35), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 24)
                         }
-                        .benCard()
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 24)
                     }
 
                     // Benefits Breakdown
@@ -190,6 +240,39 @@ struct CardDetailView: View {
             }
         }
         .preferredColorScheme(.light)
+        // Celebration: first time this card's captured benefits beat its
+        // annual fee, rain confetti (once per card, per user).
+        .overlay {
+            if showConfetti {
+                ConfettiView()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+        }
+        .onAppear { celebrateIfFeeBeaten() }
+        .onChange(of: totalUtilizedAnnual) { _, _ in celebrateIfFeeBeaten() }
+    }
+
+    // MARK: - Fee-Beaten Celebration
+
+    private func celebrateIfFeeBeaten() {
+        guard card.annualFee > 0, totalUtilizedAnnual > card.annualFee else { return }
+
+        var celebrated = CacheManager.shared.load([String].self, for: .celebratedCards) ?? []
+        guard !celebrated.contains(card.id) else { return }
+        celebrated.append(card.id)
+        CacheManager.shared.save(celebrated, for: .celebratedCards)
+
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        withAnimation { showConfetti = true }
+
+        // Emission stops at ~4s (ConfettiView); remove the overlay once the
+        // last particles have fallen through.
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(9))
+            withAnimation(.easeOut(duration: 0.5)) { showConfetti = false }
+        }
     }
 }
 
@@ -249,6 +332,14 @@ struct AmexBenefitRow: View {
         benefit.canAutoDetect
     }
 
+    // Wrong-card suggestion targeting this benefit (spend on another card
+    // that this benefit would cover).
+    private var missedOpportunity: MissedBenefitOpportunity? {
+        dataManager.missedOpportunities.first {
+            $0.benefit.id == benefit.id && $0.coveringCard.id == cardId
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Button(action: {
@@ -298,13 +389,25 @@ struct AmexBenefitRow: View {
                                 Text("Not used • \(benefit.annualAmount.asCurrency()) available")
                                     .font(Ben.Font.bodySmall)
                                     .foregroundColor(Ben.Color.textMuted)
-                                
+
                                 if !canAutoDetect {
                                     Text("• Tap to mark")
                                         .font(Ben.Font.bodySmall)
                                         .foregroundColor(Ben.Color.forest)
                                 }
                             }
+                        }
+
+                        // Wrong-card callout: eligible spend happened elsewhere.
+                        if let opportunity = missedOpportunity {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .font(.system(size: 11))
+                                Text("Paid \(opportunity.merchantDisplayName) on \(opportunity.paidCardNames.joined(separator: ", ")) — use this card")
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .font(Ben.Font.caption)
+                            .foregroundColor(Ben.Color.warn)
                         }
                     }
 
@@ -330,7 +433,8 @@ struct AmexBenefitRow: View {
                     benefit: benefit,
                     amountUsed: amountUsed,
                     totalValue: totalValue,
-                    transactions: matchedTransactions
+                    transactions: matchedTransactions,
+                    wrongCardTransactions: missedOpportunity?.matchedTransactions ?? []
                 )
                 .environmentObject(dataManager)
             }
@@ -352,32 +456,31 @@ struct BenefitTransactionsView: View {
     let amountUsed: Double
     let totalValue: Double
     let transactions: [Transaction]
+    /// Eligible purchases made on OTHER cards (wrong-card opportunities).
+    var wrongCardTransactions: [Transaction] = []
     @EnvironmentObject var dataManager: AppDataManager
     @Environment(\.dismiss) private var dismiss
     @State private var showingAllTransactions = false
     @State private var searchText = ""
     
-    private var cardTransactions: [Transaction] {
-        // Get all transactions from the card's accounts
-        guard let card = dataManager.userCards.first(where: { $0.benefits.contains(where: { $0.id == benefit.id }) }) else {
-            return []
-        }
-        
-        let accountIds = dataManager.cardMatches
-            .filter { $0.creditCard?.id == card.id }
-            .map { $0.plaidAccount.id }
-        
-        return dataManager.plaidService.transactions
-            .filter { accountIds.contains($0.accountId) }
+    /// Every transaction across all connected cards, newest first. This box is
+    /// meant to be a "search all" tool — scoping it to one card's accounts hid
+    /// charges that landed on a different card (and made recent items look
+    /// missing).
+    private var allTransactions: [Transaction] {
+        dataManager.plaidService.transactions
             .sorted(by: { $0.date > $1.date })
     }
-    
+
     private var filteredTransactions: [Transaction] {
         if searchText.isEmpty {
-            return cardTransactions
+            return allTransactions
         }
-        return cardTransactions.filter {
+        // Match against both the raw name and Plaid's cleaned merchant_name so
+        // a brand like "Uber" is found even when the raw descriptor differs.
+        return allTransactions.filter {
             $0.merchant.localizedCaseInsensitiveContains(searchText) ||
+            ($0.merchantName?.localizedCaseInsensitiveContains(searchText) ?? false) ||
             ($0.category?.localizedCaseInsensitiveContains(searchText) ?? false)
         }
     }
@@ -436,6 +539,20 @@ struct BenefitTransactionsView: View {
                                 TransactionRowView(transaction: transaction)
                                     .listRowBackground(Ben.Color.sand)
                             }
+                        }
+                    }
+
+                    // Wrong-card purchases: eligible spend made on other cards.
+                    if !wrongCardTransactions.isEmpty {
+                        Section {
+                            ForEach(wrongCardTransactions) { transaction in
+                                TransactionRowView(transaction: transaction, showType: true)
+                                    .listRowBackground(Ben.Color.sand)
+                            }
+                        } header: {
+                            Text("Eligible Purchases on Other Cards (\(wrongCardTransactions.count))")
+                        } footer: {
+                            Text("These purchases were made on a card that doesn't carry this benefit. Switching to this card could cover them.")
                         }
                     }
                     

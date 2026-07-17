@@ -30,6 +30,14 @@ final class CacheManager {
         // Transaction IDs we've already surfaced a "benefit matched" notification
         // for (per user; cleared on sign-out). nil file == baseline not yet seeded.
         case notifiedMatchIds
+        // Wrong-card suggestion keys the user dismissed (permanently).
+        case dismissedOpportunities
+        // Transaction IDs already covered by a wrong-card alert. nil file ==
+        // first run (one summary alert for existing misses, then new-only).
+        case notifiedOpportunityTxnIds
+        // Card IDs whose "benefits captured beat the annual fee" confetti has
+        // already played (once per card, per user).
+        case celebratedCards
     }
 
     private init() {

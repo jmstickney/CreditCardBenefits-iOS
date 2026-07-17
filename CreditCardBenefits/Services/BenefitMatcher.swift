@@ -31,8 +31,10 @@ class BenefitMatcher {
         subscriptions: [Subscription],
         userCards: [CreditCard]
     ) throws -> [BenefitMatch] {
+        // No cards yet (e.g. mid-reconnect, before cards are confirmed) simply
+        // means no matches — not an error worth alerting the user about.
         guard !userCards.isEmpty else {
-            throw BenefitMatcherError.invalidCardData
+            return []
         }
         
         var matches: [BenefitMatch] = []

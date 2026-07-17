@@ -27,6 +27,9 @@ struct SettingsView: View {
     @AppStorage(NotificationManager.benefitMatchNotificationsKey)
     private var notifyOnBenefitMatch = true
 
+    @AppStorage(NotificationManager.missedBenefitNotificationsKey)
+    private var notifyOnMissedBenefit = true
+
     #if DEBUG
     @State private var plaidLinkToken: PlaidLinkToken?
     @State private var showConnectSignIn = false
@@ -212,10 +215,11 @@ struct SettingsView: View {
     private var notificationsSection: some View {
         Section {
             Toggle("Benefit auto-tracked alerts", isOn: $notifyOnBenefitMatch)
+            Toggle("Wrong-card alerts", isOn: $notifyOnMissedBenefit)
         } header: {
             Text("Notifications")
         } footer: {
-            Text("Get notified when Ben detects one of your benefit credits was used.")
+            Text("Benefit alerts fire when Ben detects a credit was used. Wrong-card alerts fire when a purchase could have been covered by a benefit on a different card.")
         }
     }
 

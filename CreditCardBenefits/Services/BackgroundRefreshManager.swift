@@ -194,6 +194,25 @@ final class BackgroundRefreshManager {
             transactions: plaidService.transactions
         )
 
+        // Wrong-card detection: account→card mapping from the cached mappings
+        // (CardMatch objects only exist in the foreground flow).
+        let cachedMappings = cache.load([String: CardMapping].self, for: .cardMappings) ?? [:]
+        var accountToCardId: [String: String] = [:]
+        for (accountId, mapping) in cachedMappings {
+            if let cardId = mapping.creditCardId {
+                accountToCardId[accountId] = cardId
+            }
+        }
+        let dismissed = Set(cache.load([String].self, for: .dismissedOpportunities) ?? [])
+        let opportunities = MissedBenefitDetector.detect(
+            transactions: plaidService.transactions,
+            userCards: userCards,
+            accountToCardId: accountToCardId,
+            utilizations: utilizationService.utilizations,
+            dismissedKeys: dismissed
+        )
+        await NotificationManager.shared.notifyMissedBenefits(opportunities)
+
         // Save everything to cache
         cache.save(plaidService.transactions, for: .transactions)
         cache.save(plaidService.accounts, for: .plaidAccounts)
