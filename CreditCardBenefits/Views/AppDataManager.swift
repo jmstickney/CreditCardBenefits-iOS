@@ -133,10 +133,19 @@ class AppDataManager: ObservableObject {
         if hasConnection {
             // processPlaidAccounts() calls loadData() which processes utilizations,
             // matches benefits, calculates stats, and saves to cache — all in one pass.
+            // On a brand-new connection this first pass runs before the sync
+            // below has landed anything, so it sees little/no data.
             await processPlaidAccounts()
             // Ask the server to pull the latest from Plaid; the listener surfaces
-            // new transactions as they land.
+            // new transactions as they land — but the listener's own updates are
+            // ignored while isRestoringState is true (see HomeView), so without
+            // this explicit follow-up pass, a new card's matches would only be
+            // picked up if a listener update happens to land after this method
+            // returns. Reprocessing here guarantees one accurate pass against
+            // the (by now synced) data, so match/opportunity notifications for
+            // a newly connected card aren't missed or based on partial data.
             await plaidService.refreshTransactions()
+            loadData(from: plaidService.transactions)
 
             // Check whether any bank connection has expired (needs reconnect).
             await plaidService.fetchItemsStatus()
@@ -301,6 +310,39 @@ class AppDataManager: ObservableObject {
         )
         if !missedOpportunities.isEmpty {
             benLog("💡 Missed-benefit opportunities: \(missedOpportunities.count)")
+        }
+    }
+
+    // MARK: - Expiring Benefit Reminders
+
+    /// Unused (or partially used) benefit credits whose current period is
+    /// about to reset. Time-based and self-expiring, so no persistence or
+    /// dismissal is needed. Window is tiered by period type: a flat 30-day
+    /// rule would keep every unused MONTHLY credit flagged all month long.
+    var expiringReminders: [BenefitReminder] {
+        let now = Date()
+        return utilizationService.utilizations.compactMap { util -> BenefitReminder? in
+            guard util.periodStart <= now, now <= util.periodEnd,
+                  util.periodType != .oneTime,
+                  util.amountRemaining > 0,
+                  let benefit = CreditCardsData.getBenefit(by: util.benefitId),
+                  let card = userCards.first(where: { $0.id == util.cardId })
+            else { return nil }
+
+            let daysLeft = util.daysUntilExpiry
+            let window = util.periodType == .monthly ? 7 : 30
+            guard daysLeft > 0, daysLeft <= window else { return nil }
+
+            return BenefitReminder(
+                utilization: util,
+                benefit: benefit,
+                card: card,
+                daysLeft: daysLeft,
+                remaining: util.amountRemaining
+            )
+        }
+        .sorted {
+            ($0.daysLeft, -$0.remaining) < ($1.daysLeft, -$1.remaining)
         }
     }
 
@@ -649,6 +691,19 @@ class AppDataManager: ObservableObject {
         // Process the new data
         await restoreState()
     }
+}
+
+// MARK: - Benefit Reminder
+
+/// An unused benefit credit whose current period resets soon.
+struct BenefitReminder: Identifiable {
+    let utilization: BenefitUtilization
+    let benefit: CreditCardBenefit
+    let card: CreditCard
+    let daysLeft: Int
+    let remaining: Double
+
+    var id: String { utilization.id }
 }
 
 // MARK: - Error Handling

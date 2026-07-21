@@ -127,6 +127,40 @@ class BenefitUtilizationService: ObservableObject {
 
             // Also create records for non-auto-detect benefits (so they show in UI)
             for benefit in card.benefits where !benefit.canAutoDetect {
+                // Manual marks live on an ANNUAL basis (see markBenefitUsed):
+                // preserve any active mark through reprocessing, migrating
+                // legacy monthly-shaped marks up to their annual value.
+                let now = Date()
+                if let manual = utilizations.first(where: {
+                    $0.benefitId == benefit.id && $0.cardId == card.id &&
+                    $0.isManuallyMarked && $0.amountUtilized > 0 &&
+                    $0.periodStart <= now && now <= $0.periodEnd
+                }) {
+                    if manual.periodType == .monthly {
+                        let (start, end) = BenefitPeriodHelper.currentPeriod(for: .calendarYear)
+                        newUtilizations.append(BenefitUtilization(
+                            id: manual.id,
+                            benefitId: benefit.id,
+                            cardId: card.id,
+                            userId: userId,
+                            periodStart: start,
+                            periodEnd: end,
+                            periodType: .calendarYear,
+                            totalValue: benefit.annualAmount,
+                            amountUtilized: benefit.annualAmount,
+                            matchedTransactionIds: manual.matchedTransactionIds,
+                            isManuallyMarked: true,
+                            manualNote: manual.manualNote,
+                            manualClaimDate: manual.manualClaimDate,
+                            createdAt: manual.createdAt,
+                            updatedAt: Date()
+                        ))
+                    } else {
+                        newUtilizations.append(manual)
+                    }
+                    continue
+                }
+
                 let (periodStart, periodEnd) = BenefitPeriodHelper.currentPeriod(for: benefit.period)
 
                 let existingUtilization = utilizations.first {
@@ -238,7 +272,13 @@ class BenefitUtilizationService: ObservableObject {
 
     // MARK: - Manual Claim
 
-    /// Manually marks a benefit as used
+    /// Manually marks a benefit as used (or unused, with amount 0).
+    ///
+    /// Manual marks are recorded on an ANNUAL basis: toggling "I'm using this
+    /// benefit" for an ongoing subscription credit (Apple TV+, Uber Cash,
+    /// DoorDash…) means it's in use for the year, so Benefits Captured counts
+    /// the benefit's annual value — not just the current month's slice, which
+    /// both undercounted and silently reset at every month boundary.
     func markBenefitUsed(
         benefitId: String,
         cardId: String,
@@ -250,34 +290,39 @@ class BenefitUtilizationService: ObservableObject {
             throw UtilizationError.benefitNotFound
         }
 
-        let (periodStart, periodEnd) = BenefitPeriodHelper.currentPeriod(for: benefit.period)
+        // Monthly benefits get an annualized record; longer periods keep theirs.
+        let effectivePeriod: BenefitPeriod =
+            benefit.period == .monthly ? .calendarYear : benefit.period
+        let (periodStart, periodEnd) = BenefitPeriodHelper.currentPeriod(for: effectivePeriod)
+        let now = Date()
+        let marked = amount > 0
 
-        // Find or create utilization
-        var utilization: BenefitUtilization
-        if let existing = utilizations.first(where: {
-            $0.benefitId == benefitId &&
-            $0.cardId == cardId &&
-            $0.periodStart == periodStart
-        }) {
-            utilization = existing
-            utilization.amountUtilized = min(utilization.amountUtilized + amount, utilization.totalValue)
-        } else {
-            utilization = BenefitUtilization(
-                benefitId: benefitId,
-                cardId: cardId,
-                userId: userId,
-                periodStart: periodStart,
-                periodEnd: periodEnd,
-                periodType: benefit.period,
-                totalValue: BenefitPeriodHelper.periodValue(for: benefit, periodStart: periodStart, periodEnd: periodEnd),
-                amountUtilized: amount
-            )
+        // Reuse whatever record currently covers today (the default monthly
+        // record or a previous manual mark), migrating its identity so
+        // Firestore updates in place.
+        let existing = utilizations.first {
+            $0.benefitId == benefitId && $0.cardId == cardId &&
+            $0.periodStart <= now && now <= $0.periodEnd
         }
 
-        utilization.isManuallyMarked = true
-        utilization.manualNote = note
-        utilization.manualClaimDate = Date()
-        utilization.updatedAt = Date()
+        let utilization = BenefitUtilization(
+            id: existing?.id ?? UUID().uuidString,
+            benefitId: benefitId,
+            cardId: cardId,
+            userId: userId,
+            periodStart: periodStart,
+            periodEnd: periodEnd,
+            periodType: effectivePeriod,
+            totalValue: benefit.annualAmount,
+            // SET, not add — so toggling off (amount 0) actually clears it.
+            amountUtilized: marked ? min(amount, benefit.annualAmount) : 0,
+            matchedTransactionIds: existing?.matchedTransactionIds ?? [],
+            isManuallyMarked: marked,
+            manualNote: marked ? note : nil,
+            manualClaimDate: marked ? Date() : nil,
+            createdAt: existing?.createdAt ?? Date(),
+            updatedAt: Date()
+        )
 
         // Save to Firestore
         try await saveUtilization(utilization, userId: userId)

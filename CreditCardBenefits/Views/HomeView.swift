@@ -14,7 +14,8 @@ struct HomeView: View {
     @State private var reconnectLinkToken: LinkTokenItem?
     @State private var showSignIn = false
     @State private var showingCapturedBreakdown = false
-    @State private var dismissCandidate: MissedBenefitOpportunity?
+    @State private var showingSavingsSheet = false
+    @State private var showingRemindersSheet = false
 
     private struct LinkTokenItem: Identifiable {
         let id = UUID()
@@ -48,6 +49,31 @@ struct HomeView: View {
                         .padding(.top, 12)
                     }
 
+                    // Fresh connection: Plaid delivers recent transactions
+                    // immediately and backfills the deep history over the next
+                    // few minutes — tell the user instead of looking incomplete.
+                    if dataManager.plaidService.isImportingHistory {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Importing your transaction history")
+                                    .font(Ben.Font.body)
+                                    .foregroundColor(Ben.Color.textPrimary)
+                                Text("Recent activity is in — up to 24 months of history is still arriving. This usually takes a few minutes.")
+                                    .font(Ben.Font.caption)
+                                    .foregroundColor(Ben.Color.textMuted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(Ben.Spacing.md)
+                        .background(Ben.Color.sand)
+                        .cornerRadius(Ben.Radius.lg)
+                        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                    }
+
                     // New HomeHeaderView component
                     HomeHeaderView(
                         usedValue: totalUsedValue,
@@ -55,28 +81,20 @@ struct HomeView: View {
                         onHeroTap: { showingCapturedBreakdown = true }
                     )
 
-                    // Savings opportunities directly under the hero — the most
-                    // actionable insight, so it stays above the fold.
-                    if !dataManager.missedOpportunities.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Savings Opportunities")
-                                .font(Ben.Font.bodyLarge)
-                                .foregroundColor(Ben.Color.textPrimary)
-                                .padding(.horizontal, 20)
-
-                            ForEach(dataManager.missedOpportunities.prefix(3)) { opportunity in
-                                NavigationLink(destination: SwipeableCardDetailView(
-                                    initialCard: opportunity.coveringCard,
-                                    allCards: dataManager.userCards
-                                )) {
-                                    OpportunityCard(opportunity: opportunity) {
-                                        dismissCandidate = opportunity
-                                    }
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .padding(.horizontal, 20)
+                    // Summary chips under the hero (Benefits-Captured pattern):
+                    // compact summed value + capped preview, tap for the full
+                    // breakdown sheet. Stacked vertically; each only when
+                    // it has content.
+                    if hasSavings || hasReminders {
+                        VStack(spacing: 12) {
+                            if hasSavings {
+                                savingsChip
+                            }
+                            if hasReminders {
+                                remindersChip
                             }
                         }
+                        .padding(.horizontal, Ben.Spacing.screenH)
                         .padding(.bottom, 16)
                     }
 
@@ -196,21 +214,13 @@ struct HomeView: View {
                     dataManager.loadData(from: newTransactions)
                 }
             }
-            .alert(
-                "Hide this suggestion?",
-                isPresented: Binding(
-                    get: { dismissCandidate != nil },
-                    set: { if !$0 { dismissCandidate = nil } }
-                ),
-                presenting: dismissCandidate
-            ) { candidate in
-                Button("Hide Permanently", role: .destructive) {
-                    dataManager.dismissOpportunity(candidate)
-                    dismissCandidate = nil
-                }
-                Button("Cancel", role: .cancel) { dismissCandidate = nil }
-            } message: { candidate in
-                Text("Ben will permanently stop suggesting \(candidate.benefit.name) for \(candidate.merchantDisplayName) purchases. This can't be undone unless you sign out and back in.")
+            .sheet(isPresented: $showingSavingsSheet) {
+                SavingsOpportunitiesSheet()
+                    .environmentObject(dataManager)
+            }
+            .sheet(isPresented: $showingRemindersSheet) {
+                RemindersSheet()
+                    .environmentObject(dataManager)
             }
             .sheet(isPresented: $showingCapturedBreakdown) {
                 BenefitsCapturedBreakdownView(
@@ -267,6 +277,41 @@ struct HomeView: View {
         dataManager.stats
     }
     
+    // MARK: - Insight Summary Chips (Savings / Reminders)
+
+    private var hasSavings: Bool { !dataManager.missedOpportunities.isEmpty }
+    private var hasReminders: Bool { !dataManager.expiringReminders.isEmpty }
+
+    private var savingsChip: some View {
+        let opportunities = dataManager.missedOpportunities
+        let total = opportunities.reduce(0.0) { $0 + $1.benefit.annualAmount }
+        return InsightSummaryChip(
+            tag: "Savings Opportunities",
+            headline: "Up to \(total.asCurrency())/yr",
+            headlineColor: Ben.Color.mintDark,
+            previewLines: opportunities.prefix(2).map {
+                "\($0.merchantDisplayName) → \($0.coveringCard.name)"
+            },
+            moreCount: max(0, opportunities.count - 2),
+            action: { showingSavingsSheet = true }
+        )
+    }
+
+    private var remindersChip: some View {
+        let reminders = dataManager.expiringReminders
+        let total = reminders.reduce(0.0) { $0 + $1.remaining }
+        return InsightSummaryChip(
+            tag: "Expiring Soon",
+            headline: "\(total.asCurrency()) left to use",
+            headlineColor: Ben.Color.warn,
+            previewLines: reminders.prefix(2).map {
+                "\($0.benefit.name) — \($0.remaining.asCurrency()) · \($0.daysLeft)d"
+            },
+            moreCount: max(0, reminders.count - 2),
+            action: { showingRemindersSheet = true }
+        )
+    }
+
     // MARK: - Reconnect
 
     /// Card name for the first item needing reconnection (nil → generic copy).
@@ -385,6 +430,64 @@ struct AmexStyleCardRow: View {
     }
 }
 
+// MARK: - Insight Summary Chip
+// Compact tappable summary (Benefits-Captured pattern): summed value, a capped
+// preview list, and a chevron; tap opens the full breakdown sheet.
+struct InsightSummaryChip: View {
+    let tag: String
+    let headline: String
+    let headlineColor: Color
+    let previewLines: [String]
+    let moreCount: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 0) {
+                // Matches BenefitProgressHeroCard's label + chevron row.
+                HStack(spacing: Ben.Spacing.xs) {
+                    Text(tag)
+                        .font(Ben.Font.tag)
+                        .tracking(1.0)
+                        .textCase(.uppercase)
+                        .foregroundColor(Ben.Color.textMuted)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Ben.Color.textMuted)
+                }
+                .padding(.bottom, Ben.Spacing.xs)
+
+                Text(headline)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(headlineColor)
+                    .padding(.bottom, 6)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(previewLines, id: \.self) { line in
+                        Text(line)
+                            .font(Ben.Font.bodySmall)
+                            .foregroundColor(Ben.Color.textBody)
+                            .lineLimit(1)
+                    }
+                    if moreCount > 0 {
+                        Text("+ \(moreCount) more")
+                            .font(Ben.Font.caption)
+                            .foregroundColor(Ben.Color.textMuted)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // Same surface treatment as BenefitProgressHeroCard.
+            .padding(Ben.Spacing.xl)
+            .background(Color.white)
+            .cornerRadius(Ben.Radius.xl)
+            .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
 // MARK: - Reconnect Banner
 // Shown when a bank login expired (Plaid ITEM_LOGIN_REQUIRED). Tapping
 // Reconnect launches Plaid Link in update mode to re-authenticate in place.
@@ -427,61 +530,6 @@ struct ReconnectBanner: View {
         .overlay(
             RoundedRectangle(cornerRadius: Ben.Radius.lg)
                 .stroke(Ben.Color.warn.opacity(0.35), lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - Opportunity Card
-// A wrong-card suggestion: spend at a benefit-eligible merchant happened on a
-// card that doesn't carry the benefit while another connected card does.
-struct OpportunityCard: View {
-    let opportunity: MissedBenefitOpportunity
-    let onDismiss: () -> Void
-
-    private var paidOn: String {
-        opportunity.paidCardNames.joined(separator: ", ")
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "lightbulb.fill")
-                .font(.system(size: 18))
-                .foregroundColor(Ben.Color.mintDark)
-                .padding(.top, 2)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(opportunity.merchantDisplayName) — paid on \(paidOn)")
-                    .font(Ben.Font.body)
-                    .foregroundColor(Ben.Color.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text("Switch to your \(opportunity.coveringCard.name): \(opportunity.benefit.name) covers this (up to \(opportunity.benefit.annualAmount.asCurrency())/yr).")
-                    .font(Ben.Font.bodySmall)
-                    .foregroundColor(Ben.Color.textMuted)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                let count = opportunity.matchedTransactions.count
-                Text("\(count) purchase\(count == 1 ? "" : "s") in the last 90 days")
-                    .font(Ben.Font.caption)
-                    .foregroundColor(Ben.Color.textMuted.opacity(0.8))
-            }
-
-            Spacer(minLength: 4)
-
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Ben.Color.textMuted)
-                    .padding(6)
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .padding(Ben.Spacing.md)
-        .background(Ben.Color.mintLight.opacity(0.5))
-        .cornerRadius(Ben.Radius.lg)
-        .overlay(
-            RoundedRectangle(cornerRadius: Ben.Radius.lg)
-                .stroke(Ben.Color.mint.opacity(0.5), lineWidth: 1)
         )
     }
 }

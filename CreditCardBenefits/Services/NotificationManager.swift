@@ -228,6 +228,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
         let seenList = CacheManager.shared.load([String].self, for: .notifiedMatchIds)
         let seen = Set(seenList ?? [])
+        let isFirstRun = seenList == nil
 
         var currentMatchedIds = Set<String>()
         var events: [MatchEvent] = []
@@ -242,20 +243,16 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             for txnId in utilization.matchedTransactionIds {
                 currentMatchedIds.insert(txnId)
                 guard !seen.contains(txnId), let txn = txnById[txnId] else { continue }
-                if txn.date >= recentCutoff {
+                // The recency filter exists to avoid re-surfacing old noise
+                // during ongoing use. On a brand-new card's first sync, every
+                // match is new information to the user regardless of how old
+                // the underlying transaction is (Plaid returns up to 24
+                // months of history), so don't filter it out here.
+                if isFirstRun || txn.date >= recentCutoff {
                     events.append(MatchEvent(benefit: benefit, cardName: cardName, transaction: txn))
                 }
             }
         }
-
-        // First run for this user: record the baseline silently so we don't
-        // notify for everything that was already matched before this feature ran.
-        guard seenList != nil else {
-            CacheManager.shared.save(Array(currentMatchedIds), for: .notifiedMatchIds)
-            return
-        }
-
-        guard !events.isEmpty else { return }
 
         // Even if we don't fire, mark these as seen so we don't queue a backlog
         // to fire the moment the user re-enables the toggle / grants permission.
@@ -271,8 +268,38 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             return
         }
 
+        guard !events.isEmpty else {
+            persistSeen()
+            return
+        }
+
+        if isFirstRun {
+            // One informative summary for the initial sync, instead of either
+            // total silence (previous behavior) or a flood of one push per
+            // match — a new card's first sync can span up to 24 months.
+            let content = UNMutableNotificationContent()
+            content.title = "Ben found your benefit credits ✅"
+            content.body = events.count == 1
+                ? singleMatchBody(events[0])
+                : "Ben found \(events.count) benefit credits already in use across your cards, worth \(events.reduce(0.0) { $0 + $1.transaction.amount }.asCurrency()). Open Ben to see the details."
+            content.sound = .default
+            let request = UNNotificationRequest(
+                identifier: "match-baseline",
+                content: content,
+                trigger: nil
+            )
+            try? await center.add(request)
+            benLog("🔔 Benefit-match baseline alert (\(events.count))")
+            persistSeen()
+            return
+        }
+
         await fireMatchNotifications(events)
         persistSeen()
+    }
+
+    private func singleMatchBody(_ event: MatchEvent) -> String {
+        "\(event.transaction.amount.asCurrency()) toward your \(event.benefit.name) on \(event.cardName) — detected at \(event.transaction.merchant)."
     }
 
     private struct MatchEvent {
@@ -287,9 +314,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             for event in events {
                 let content = UNMutableNotificationContent()
                 content.title = "Benefit credit tracked ✅"
-                content.body = "\(event.transaction.amount.asCurrency()) toward your "
-                    + "\(event.benefit.name) on \(event.cardName)"
-                    + " — detected at \(event.transaction.merchant)."
+                content.body = singleMatchBody(event)
                 content.sound = .default
 
                 let request = UNNotificationRequest(

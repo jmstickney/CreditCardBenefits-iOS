@@ -8,6 +8,8 @@
 import Foundation
 import Combine
 import StoreKit
+import FirebaseAuth
+import FirebaseFirestore
 
 @MainActor
 final class SubscriptionManager: ObservableObject {
@@ -76,6 +78,22 @@ final class SubscriptionManager: ObservableObject {
         isSubscribed = active
         hasLoadedEntitlements = true
         benLog("💳 Subscription status: \(active ? "active" : "not subscribed")")
+        reportStatusToServer()
+    }
+
+    /// Mirrors subscription state onto the user's Firestore doc so the backend
+    /// cleanup cron can spare subscribers' Plaid items (non-subscribers'
+    /// connections are removed after ~7 days to control Plaid costs).
+    private func reportStatusToServer() {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        Firestore.firestore().collection("users").document(uid).setData([
+            "subscriptionActive": isSubscribed,
+            "subscriptionUpdatedAt": FieldValue.serverTimestamp(),
+        ], merge: true) { error in
+            if let error {
+                benLog("⚠️ Failed to report subscription status: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Purchase / Restore

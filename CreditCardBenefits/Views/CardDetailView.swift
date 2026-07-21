@@ -49,6 +49,38 @@ struct CardDetailView: View {
         card.benefits.first { $0.period == .cardmemberYear }?.name ?? "annual credit"
     }
 
+    // MARK: - Adjacent Cards (swipe hint)
+
+    private var cardIndex: Int? {
+        allCards.firstIndex { $0.id == card.id }
+    }
+
+    private var previousCard: CreditCard? {
+        guard let index = cardIndex, index > 0 else { return nil }
+        return allCards[index - 1]
+    }
+
+    private var nextCard: CreditCard? {
+        guard let index = cardIndex, index + 1 < allCards.count else { return nil }
+        return allCards[index + 1]
+    }
+
+    /// A sliver of an adjacent card, clipped so only ~26pt shows at the screen
+    /// edge — signals that swiping left/right moves between cards.
+    private func peekCard(_ card: CreditCard, visibleEdge: Alignment) -> some View {
+        RoundedRectangle(cornerRadius: 14)
+            .fill(LinearGradient(
+                colors: Color.cardGradient(for: card.issuer),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ))
+            .frame(width: 240, height: 150)
+            .frame(width: 26, alignment: visibleEdge)
+            .clipped()
+            .opacity(0.85)
+            .allowsHitTesting(false)
+    }
+
     var body: some View {
         ZStack {
             // Ben cream background
@@ -56,34 +88,50 @@ struct CardDetailView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    // Large card image at top (like Amex)
+                    // Card image row — Amex-app style: the current card front
+                    // and center (slightly smaller than before to reclaim
+                    // vertical space) with slivers of the adjacent cards
+                    // peeking in from the edges, hinting that the screen
+                    // swipes left/right between cards.
                     ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(LinearGradient(
-                                colors: Color.cardGradient(for: card.issuer),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                            .frame(height: 200)
-                            .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
-                        
-                        VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            if let prev = previousCard {
+                                peekCard(prev, visibleEdge: .trailing)
+                            }
                             Spacer()
-                            
-                            Text(card.name)
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-
-                            Text("•••• \(String(card.id.suffix(4)))")
-                                .font(.system(size: 14))
-                                .foregroundColor(.white.opacity(0.9))
+                            if let next = nextCard {
+                                peekCard(next, visibleEdge: .leading)
+                            }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(24)
+
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(LinearGradient(
+                                    colors: Color.cardGradient(for: card.issuer),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ))
+                                .frame(height: 170)
+                                .shadow(color: .black.opacity(0.25), radius: 14, y: 8)
+
+                            VStack(alignment: .leading, spacing: 8) {
+                                Spacer()
+
+                                Text(card.name)
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(.white)
+
+                                Text("•••• \(String(card.id.suffix(4)))")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.white.opacity(0.9))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(20)
+                        }
+                        .padding(.horizontal, 44)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 80)
-                    .padding(.bottom, 32)
+                    .padding(.top, 48)
+                    .padding(.bottom, 24)
 
                     // Benefits Captured hero (matches homepage layout, scoped to this card)
                     BenefitProgressHeroCard(
@@ -476,12 +524,12 @@ struct BenefitTransactionsView: View {
         if searchText.isEmpty {
             return allTransactions
         }
-        // Match against both the raw name and Plaid's cleaned merchant_name so
-        // a brand like "Uber" is found even when the raw descriptor differs.
+        // Transaction TEXT only (raw name + Plaid's cleaned merchant_name).
+        // Category matching was removed: searching "travel" buried the actual
+        // "TRAVEL CREDIT" rows under every travel-category purchase.
         return allTransactions.filter {
             $0.merchant.localizedCaseInsensitiveContains(searchText) ||
-            ($0.merchantName?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-            ($0.category?.localizedCaseInsensitiveContains(searchText) ?? false)
+            ($0.merchantName?.localizedCaseInsensitiveContains(searchText) ?? false)
         }
     }
     
@@ -559,7 +607,7 @@ struct BenefitTransactionsView: View {
                     // Search All Transactions Section
                     Section(header: Text("Search All Transactions")) {
                         VStack(spacing: 0) {
-                            TextField("Search merchant or category", text: $searchText)
+                            TextField("Search transactions", text: $searchText)
                                 .textFieldStyle(.plain)
                                 .padding(12)
                                 .background(Ben.Color.textMuted.opacity(0.2))

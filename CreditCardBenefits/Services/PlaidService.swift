@@ -30,6 +30,14 @@ class PlaidService: ObservableObject {
 
     var needsReconnect: Bool { !itemsNeedingReconnect.isEmpty }
 
+    /// True while a freshly connected bank's transaction history is still
+    /// backfilling (drives the "importing history" notice).
+    var isImportingHistory: Bool {
+        itemStatuses.contains { !$0.historicalComplete }
+    }
+
+    private var historyMonitorTask: Task<Void, Never>?
+
     private let functions = Functions.functions()
     private let db = Firestore.firestore()
     private var transactionsListener: ListenerRegistration?
@@ -219,6 +227,8 @@ class PlaidService: ObservableObject {
             await fetchAccounts()
             startTransactionsListener()
             await refreshTransactions()
+            // Surfaces the "importing history" notice + starts its monitor.
+            await fetchItemsStatus()
 
         } catch {
             await MainActor.run {
@@ -283,6 +293,8 @@ class PlaidService: ObservableObject {
         }
 
         stopTransactionsListener()
+        historyMonitorTask?.cancel()
+        historyMonitorTask = nil
         await MainActor.run {
             self.isLinked = false
             self.dataSource = .none
@@ -425,13 +437,75 @@ class PlaidService: ObservableObject {
                     itemId: itemId,
                     needsReconnect: dict["needsReconnect"] as? Bool ?? false,
                     errorCode: dict["errorCode"] as? String,
-                    lastSyncedAt: ms.map { Date(timeIntervalSince1970: $0 / 1000) }
+                    lastSyncedAt: ms.map { Date(timeIntervalSince1970: $0 / 1000) },
+                    historicalComplete: dict["historicalComplete"] as? Bool ?? true
                 )
             }
             await MainActor.run { self.itemStatuses = parsed }
             benLog("✅ Item statuses: \(parsed.count), reconnect needed: \(parsed.filter { $0.needsReconnect }.count)")
+            startHistoryImportMonitorIfNeeded()
         } catch {
             benLog("❌ getItemsStatus error: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - History Import Monitor
+
+    /// While any item's historical backfill is pending, periodically pulls the
+    /// latest transactions + status so the history fills in even if a webhook
+    /// is missed. Stops when every item completes (or after a 15-minute cap,
+    /// at which point statuses are marked complete locally so the notice
+    /// doesn't linger forever).
+    private func startHistoryImportMonitorIfNeeded() {
+        guard isImportingHistory, historyMonitorTask == nil else { return }
+
+        benLog("⏳ History import in progress — starting monitor")
+        historyMonitorTask = Task { [weak self] in
+            let deadline = Date().addingTimeInterval(15 * 60)
+            while let self, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(45))
+                guard Auth.auth().currentUser != nil else { break }
+                guard self.isImportingHistory else { break }
+
+                if Date() > deadline {
+                    // Assume done rather than showing the notice indefinitely.
+                    await MainActor.run {
+                        self.itemStatuses = self.itemStatuses.map { status in
+                            var updated = status
+                            updated.historicalComplete = true
+                            return updated
+                        }
+                    }
+                    break
+                }
+
+                await self.refreshTransactions()
+                await self.fetchStatusOnly()
+            }
+            await MainActor.run { [weak self] in self?.historyMonitorTask = nil }
+            benLog("✅ History import monitor finished")
+        }
+    }
+
+    /// Status refresh without re-triggering the monitor (used by the monitor).
+    private func fetchStatusOnly() async {
+        do {
+            let result = try await functions.httpsCallable("getItemsStatus").call()
+            guard let data = result.data as? [String: Any],
+                  let items = data["items"] as? [[String: Any]] else { return }
+            let complete = Dictionary(uniqueKeysWithValues: items.compactMap { dict -> (String, Bool)? in
+                guard let itemId = dict["itemId"] as? String else { return nil }
+                return (itemId, dict["historicalComplete"] as? Bool ?? true)
+            })
+            await MainActor.run {
+                self.itemStatuses = self.itemStatuses.map { status in
+                    var updated = status
+                    updated.historicalComplete = complete[status.itemId] ?? true
+                    return updated
+                }
+            }
+        } catch {
+            benLog("❌ status poll error: \(error.localizedDescription)")
         }
     }
 
@@ -569,6 +643,10 @@ struct PlaidItemStatus: Identifiable, Equatable {
     let needsReconnect: Bool
     let errorCode: String?
     let lastSyncedAt: Date?
+    /// False while Plaid is still backfilling the item's transaction history
+    /// (a fresh connection returns recent transactions first; the deep
+    /// history arrives asynchronously a few minutes later).
+    var historicalComplete: Bool = true
 
     var id: String { itemId }
 }

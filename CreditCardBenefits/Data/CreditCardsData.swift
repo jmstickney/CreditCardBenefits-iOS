@@ -258,7 +258,7 @@ struct CreditCardsData {
                     requiresEnrollment: false
                 )
             ],
-            annualFee: 695
+            annualFee: 895
         ),
 
         // MARK: - Chase Sapphire Reserve
@@ -384,9 +384,13 @@ struct CreditCardsData {
                     category: "fitness",
                     conditions: "$10/month for Peloton membership",
                     period: .monthly,
-                    canAutoDetect: false,
+                    // Chase posts this as a statement credit, so match the
+                    // CREDIT (not the Peloton membership charge itself) —
+                    // same convention as the other statement-credit benefits.
+                    canAutoDetect: true,
                     requiresEnrollment: true,
-                    enrollmentUrl: "https://www.onepeloton.com/chase"
+                    enrollmentUrl: "https://www.onepeloton.com/chase",
+                    matchCreditTransactions: true
                 ),
                 CreditCardBenefit(
                     id: "csr-doordash",
@@ -485,7 +489,7 @@ struct CreditCardsData {
                     requiresEnrollment: false
                 )
             ],
-            annualFee: 550
+            annualFee: 795
         ),
 
         // MARK: - Chase Sapphire Reserve for Business
@@ -780,7 +784,7 @@ struct CreditCardsData {
                     enrollmentUrl: "https://www.americanexpress.com/en-us/benefits/gold-card/"
                 )
             ],
-            annualFee: 250
+            annualFee: 325
         ),
 
         // MARK: - U.S. Bank Altitude Reserve
